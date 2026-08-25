@@ -386,7 +386,7 @@ export function generateWeekPlan(input: PlanInputs): WeekPlan {
           repRange,
           restSec,
           rpe,
-          load: suggestLoad(best, logs, repRange, profile),
+          load: suggestLoad(best, logs, repRange),
           rationale,
         });
 

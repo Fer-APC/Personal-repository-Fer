@@ -1,6 +1,6 @@
 import { EXERCISE_BY_ID, progressionFamily } from './exercises';
 import { weeksBetween } from './date';
-import type { Exercise, Muscle, Profile, SessionLog } from './types';
+import type { Exercise, LoadHint, Muscle, Profile, SessionLog } from './types';
 
 export interface Performance {
   date: string;
@@ -53,20 +53,23 @@ export function suggestLoad(
   exercise: Exercise,
   logs: SessionLog[],
   repRange: [number, number],
-  profile: Profile,
-): { kg: number | null; note: string } {
+): { kg: number | null; note: string; hint: LoadHint } {
   const last = lastPerformance(logs, exercise.id);
   const [low, high] = repRange;
 
   if (!last) {
-    if (exercise.loadType === 'bodyweight' || exercise.loadType === 'time') {
-      return { kg: null, note: 'First time logged — find a step you can hold clean form on and record it.' };
-    }
-    return { kg: null, note: 'No history yet — start at an easy weight and leave 2-3 reps in reserve.' };
+    return {
+      kg: null,
+      hint: 'first_time',
+      note:
+        exercise.loadType === 'bodyweight' || exercise.loadType === 'time'
+          ? 'First time — find a version you can hold clean form on and log it.'
+          : 'First time — start easy and leave 2-3 reps in reserve.',
+    };
   }
 
   if (exercise.loadType === 'time') {
-    return { kg: null, note: `Last time: ${last.maxReps}s. Add 3-5s per set while form holds.` };
+    return { kg: null, hint: 'add_time', note: `Last time ${last.maxReps}s — add 3-5s per set while form holds.` };
   }
 
   if (exercise.loadType === 'bodyweight' || exercise.loadType === 'assisted') {
@@ -74,25 +77,25 @@ export function suggestLoad(
       const family = exercise.progression ? progressionFamily(exercise.progression) : [];
       const next = family.find((e) => (e.progressionStep ?? 0) > (exercise.progressionStep ?? 0));
       if (next) {
-        return { kg: null, note: `You cleared ${last.minReps} clean reps — time to move up to ${next.name}.` };
+        return { kg: null, hint: 'progress_step', note: `You cleared ${last.minReps} clean reps — move up to ${next.name}.` };
       }
-      return { kg: last.topWeightKg, note: `Top of the range at bodyweight — start adding external load.` };
+      return { kg: last.topWeightKg, hint: 'increase', note: 'Top of the range at bodyweight — start adding external load.' };
     }
-    return { kg: last.topWeightKg, note: `Last time: ${last.minReps}-${last.maxReps} reps. Aim for one more rep per set.` };
+    return { kg: last.topWeightKg, hint: 'hold', note: `Last time ${last.minReps}-${last.maxReps} reps — aim for one more per set.` };
   }
 
   const weight = last.topWeightKg;
   if (weight == null) {
-    return { kg: null, note: 'Log the weight this time so progression can be tracked.' };
+    return { kg: null, hint: 'log_weight', note: 'Log the weight this time so progression can be tracked.' };
   }
   const step = increment(exercise);
   if (last.minReps >= high && (last.avgRpe ?? 8) <= 8.5) {
-    return { kg: roundTo(weight + step, 0.5), note: `Cleared ${high} reps at ${weight}${profile.units === 'kg' ? 'kg' : 'kg'} — add ${step}kg.` };
+    return { kg: roundTo(weight + step, 0.5), hint: 'increase', note: `Cleared ${high} reps at ${weight}kg — add ${step}kg.` };
   }
   if (last.minReps < low || (last.avgRpe ?? 0) >= 9.5) {
-    return { kg: roundTo(weight * 0.92, 0.5), note: `Last session was a grind (${last.minReps} reps) — back off ~8% and rebuild.` };
+    return { kg: roundTo(weight * 0.92, 0.5), hint: 'backoff', note: `Last session was a grind (${last.minReps} reps) — back off ~8% and rebuild.` };
   }
-  return { kg: weight, note: `Stay at ${weight}kg until every set reaches ${high} reps.` };
+  return { kg: weight, hint: 'hold', note: `Stay at ${weight}kg until every set reaches ${high} reps.` };
 }
 
 /** Sets actually completed per muscle in a week (primary 1, secondary 0.5). */

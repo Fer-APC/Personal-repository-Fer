@@ -125,6 +125,16 @@ export interface Profile {
   deloadEveryWeeks: number;
 }
 
+/** What the load suggestion is telling you to do, for UI emphasis. */
+export type LoadHint =
+  | 'first_time'
+  | 'hold'
+  | 'increase'
+  | 'backoff'
+  | 'progress_step'
+  | 'add_time'
+  | 'log_weight';
+
 export interface PlannedExercise {
   exerciseId: string;
   /** "A", "B1", "B2" … block letter plus position inside a superset. */
@@ -134,7 +144,7 @@ export interface PlannedExercise {
   repRange: [number, number];
   restSec: number;
   rpe: number;
-  load: { kg: number | null; note: string };
+  load: { kg: number | null; note: string; hint: LoadHint };
   rationale: string;
 }
 
@@ -211,6 +221,7 @@ export interface AppState {
   /** Keyed by ISO week-start date. */
   plans: Record<string, WeekPlan>;
   logs: SessionLog[];
-  /** Weeks the user has explicitly regenerated, so we don't clobber edits. */
   onboarded: boolean;
+  /** When settings last changed — plans generated before this are stale. */
+  settingsUpdatedAt: string;
 }
