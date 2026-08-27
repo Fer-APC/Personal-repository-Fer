@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import { adaptRemainingDays, defaultState, findLog, loadState, planWeek, saveState, sessionIdFor } from '../domain/store';
 import { EXERCISE_BY_ID } from '../domain/exercises';
 import { hasLoggedWork } from '../domain/progress';
-import { toISODate } from '../domain/date';
+import { fromISODate, toISODate, weekStartISO } from '../domain/date';
 import { AD_HOC_DAY, type Activity, type AppState, type LoggedSet, type Profile, type SessionLog, type WeekPlan } from '../domain/types';
 
 interface Store {
@@ -21,6 +21,9 @@ interface Store {
   startSession: (weekStart: string, dayIndex: number) => void;
   /** Logs a session that was never in the plan. Returns its id. */
   addAdHocSession: (weekStart: string, date: string, title: string) => string;
+  /** Moves a session to another date, following it to that week if needed. */
+  setLogDate: (id: string, date: string) => void;
+  setLogTitle: (id: string, title: string) => void;
   addExerciseToLog: (id: string, exerciseId: string) => void;
   removeExerciseFromLog: (id: string, exerciseIndex: number) => void;
   /** Rebuilds the days not yet trained from what has actually been logged. */
@@ -153,6 +156,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }));
         return id;
       },
+
+      setLogDate: (id, date) =>
+        setState((s) => {
+          const existing = s.logs.find((l) => l.id === id);
+          if (!existing || !date) return s;
+          const weekStart = weekStartISO(fromISODate(date));
+          const logs = s.logs.map((l) => (l.id === id ? { ...l, date, weekStart } : l));
+          let next: AppState = { ...s, logs };
+          // Both weeks can be affected: the one it left and the one it joined.
+          for (const week of new Set([existing.weekStart, weekStart])) {
+            const revised = adaptRemainingDays(next, week);
+            if (revised) next = { ...next, plans: { ...next.plans, [week]: revised } };
+          }
+          return next;
+        }),
+
+      setLogTitle: (id, title) =>
+        setState((s) => ({ ...s, logs: s.logs.map((l) => (l.id === id ? { ...l, title } : l)) })),
 
       addExerciseToLog: (id, exerciseId) =>
         setState((s) => ({

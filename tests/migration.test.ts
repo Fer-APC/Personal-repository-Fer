@@ -8,6 +8,9 @@ import type { AppState, WeekPlan } from '../src/domain/types';
 
 const WEEK = '2026-08-24';
 
+/** A plan loosened so release-specific fields can be stripped off it. */
+type LoosePlan = Omit<WeekPlan, 'targets' | 'balance'> & { targets?: unknown; balance?: unknown };
+
 function currentPlan(): WeekPlan {
   return generateWeekPlan({
     profile: makeProfile(),
@@ -21,7 +24,7 @@ function currentPlan(): WeekPlan {
 
 /** A state as written by the previous release: no targets, no template keys. */
 function version1State(): Partial<AppState> {
-  const plan = currentPlan() as WeekPlan & { targets?: unknown };
+  const plan = currentPlan() as LoosePlan;
   delete plan.targets;
   const days = plan.days.map((day) => {
     const copy = { ...day } as Partial<typeof day>;
@@ -81,7 +84,7 @@ test('migration keeps logged sessions and settings intact', () => {
 });
 
 test('a plan with no balance rows at all still migrates', () => {
-  const plan = currentPlan() as WeekPlan & { targets?: unknown; balance?: unknown };
+  const plan = currentPlan() as LoosePlan;
   delete plan.targets;
   delete plan.balance;
   const migrated = migrate({ plans: { [WEEK]: plan as WeekPlan } });

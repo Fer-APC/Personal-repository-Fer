@@ -3,9 +3,9 @@ import { useStore } from '../app/state';
 import { EXERCISE_BY_ID } from '../domain/exercises';
 import { MUSCLE_LABEL } from '../domain/muscles';
 import { lastPerformance } from '../domain/progression';
-import { formatDayLabel } from '../domain/date';
+import { formatDayLabel, toISODate } from '../domain/date';
 import { ExercisePicker } from './ExercisePicker';
-import { Card, Chip, NumberInput } from './components';
+import { Card, Chip, Field, NumberInput } from './components';
 import { AD_HOC_DAY, type Muscle, type PlannedExercise } from '../domain/types';
 
 const SORENESS_CHECK: Muscle[] = ['quads', 'hamstrings', 'calves', 'glutes', 'chest', 'lats', 'front_delts', 'lower_back'];
@@ -25,9 +25,8 @@ export function SessionView({ logId, onBack }: { logId: string; onBack: () => vo
     );
   }
 
-  const plannedDay = log.dayIndex === AD_HOC_DAY
-    ? undefined
-    : store.planFor(log.weekStart)?.days[log.dayIndex];
+  const isUnplanned = log.dayIndex === AD_HOC_DAY;
+  const plannedDay = isUnplanned ? undefined : store.planFor(log.weekStart)?.days[log.dayIndex];
 
   /** Planned prescription for a logged exercise, matched by id not position. */
   const prescriptionFor = (exerciseId: string): PlannedExercise | undefined =>
@@ -49,6 +48,33 @@ export function SessionView({ logId, onBack }: { logId: string; onBack: () => vo
         </div>
         <button type="button" className="tiny-btn" onClick={onBack}>Done</button>
       </div>
+
+      {isUnplanned && (
+        <Card>
+          <h3>When was this?</h3>
+          <div className="row" style={{ gap: 10 }}>
+            <Field label="Date">
+              <input
+                type="date"
+                value={log.date}
+                max={toISODate(new Date())}
+                onChange={(e) => store.setLogDate(log.id, e.target.value)}
+              />
+            </Field>
+            <Field label="What was it">
+              <input
+                type="text"
+                value={log.title}
+                placeholder="Session I did"
+                onChange={(e) => store.setLogTitle(log.id, e.target.value)}
+              />
+            </Field>
+          </div>
+          <p className="tiny muted" style={{ margin: 0 }}>
+            Set the day you actually trained — it counts toward that week, even if it has already passed.
+          </p>
+        </Card>
+      )}
 
       <Card>
         <div className="row between">

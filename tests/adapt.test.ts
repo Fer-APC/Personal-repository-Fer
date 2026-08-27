@@ -283,3 +283,46 @@ test('joining late does not report the whole week as missed', () => {
 function plannedWarning(plan: WeekPlan): boolean {
   return plan.warnings.some((w) => w.includes('left this week'));
 }
+
+test('a session logged for an earlier day counts toward that day\'s week', () => {
+  const state = baseState();
+  const plan = state.plans[WEEK]!;
+  const monday = WEEK;
+  const thursday = '2026-08-27';
+
+  // Created on Thursday by default, then moved back to the Monday it happened.
+  state.logs.push({
+    id: `${WEEK}#extra-late`,
+    weekStart: WEEK,
+    date: monday,
+    dayIndex: AD_HOC_DAY,
+    title: 'Monday session',
+    completed: true,
+    sessionRpe: 8,
+    durationMin: 55,
+    soreness: {},
+    exercises: [
+      { exerciseId: 'bb_bench', sets: Array.from({ length: 4 }, () => doneSet()) },
+      { exerciseId: 'lat_pulldown', sets: Array.from({ length: 4 }, () => doneSet()) },
+    ],
+  });
+
+  // Standing on Thursday, Monday is in the past — it must still be counted.
+  const progress = computeWeekProgress(plan, state.logs, thursday);
+  assert.equal(progress.setsLogged, 8);
+  assert.ok(progress.muscles.find((m) => m.muscle === 'chest')!.logged >= 4);
+  assert.ok(progress.muscles.find((m) => m.muscle === 'lats')!.logged >= 4);
+
+  // And it must reduce what the days still ahead prescribe.
+  const revised = adaptRemainingDays(state, WEEK, thursday)!;
+  const bare = adaptRemainingDays({ ...state, logs: [] }, WEEK, thursday)!;
+  const chestSets = (plan_: WeekPlan) =>
+    plan_.days.reduce(
+      (n, day, i) => (day.date >= thursday ? n + setsAcross(plan_, [i], ['chest']) : n),
+      0,
+    );
+  assert.ok(
+    chestSets(revised) < chestSets(bare),
+    'work logged on a past day should still lighten the days ahead',
+  );
+});
