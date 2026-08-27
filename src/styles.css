@@ -16,23 +16,46 @@
   color-scheme: dark;
 }
 
+/*
+ * Dark-first. The light palette applies when the OS asks for it, unless dark
+ * was chosen explicitly; an explicit choice in either direction wins over the
+ * OS. Components only ever read tokens, never colours defined inside these
+ * blocks, so every combination resolves as a complete set.
+ */
 @media (prefers-color-scheme: light) {
-  :root {
-    --bg: #f6f8fa;
-    --surface: #ffffff;
-    --surface-2: #f2f4f7;
-    --surface-3: #e8ebf0;
-    --border: #d8dee4;
-    --text: #1f2328;
-    --muted: #5c6470;
-    --accent: #0969da;
-    --accent-soft: rgba(9, 105, 218, 0.1);
-    --good: #1a7f37;
-    --warn: #9a6700;
-    --danger: #cf222e;
-    --shadow: 0 1px 3px rgba(27, 31, 36, 0.08);
-    color-scheme: light;
+  :root:not([data-theme='dark']) {
+  --bg: #f6f8fa;
+  --surface: #ffffff;
+  --surface-2: #f2f4f7;
+  --surface-3: #e8ebf0;
+  --border: #d8dee4;
+  --text: #1f2328;
+  --muted: #5c6470;
+  --accent: #0969da;
+  --accent-soft: rgba(9, 105, 218, 0.1);
+  --good: #1a7f37;
+  --warn: #9a6700;
+  --danger: #cf222e;
+  --shadow: 0 1px 3px rgba(27, 31, 36, 0.08);
+  color-scheme: light;
   }
+}
+
+:root[data-theme='light'] {
+  --bg: #f6f8fa;
+  --surface: #ffffff;
+  --surface-2: #f2f4f7;
+  --surface-3: #e8ebf0;
+  --border: #d8dee4;
+  --text: #1f2328;
+  --muted: #5c6470;
+  --accent: #0969da;
+  --accent-soft: rgba(9, 105, 218, 0.1);
+  --good: #1a7f37;
+  --warn: #9a6700;
+  --danger: #cf222e;
+  --shadow: 0 1px 3px rgba(27, 31, 36, 0.08);
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }

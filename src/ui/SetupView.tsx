@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useStore } from '../app/state';
 import { ALL_GOALS, GOAL_BLURB, GOAL_LABEL, normaliseGoals } from '../domain/goals';
 import { ALL_MUSCLES, MUSCLE_LABEL } from '../domain/muscles';
@@ -6,7 +7,7 @@ import { DEFAULT_STRUCTURE } from '../domain/planner';
 import { WEEKDAY_LABEL } from '../domain/date';
 import { ActivityEditor } from './ActivityEditor';
 import { StructureEditor } from './StructureEditor';
-import { Card, Chip, Field, FieldGroup, Segmented, Toggles } from './components';
+import { Card, Chip, Field, FieldGroup, Modal, Segmented, Toggles } from './components';
 import type { Equipment, Goal, Muscle, Weekday } from '../domain/types';
 
 const EQUIPMENT: { value: Equipment; label: string }[] = [
@@ -25,6 +26,7 @@ const EQUIPMENT: { value: Equipment; label: string }[] = [
 export function SetupView() {
   const store = useStore();
   const { profile } = store.state;
+  const [exporting, setExporting] = useState(false);
 
   const setGoal = (goal: Goal, value: number) => {
     const raw = { ...profile.goals, [goal]: value };
@@ -234,7 +236,7 @@ export function SetupView() {
           Everything lives in this browser. Export before clearing site data or switching device.
         </p>
         <div className="row" style={{ gap: 8 }}>
-          <button type="button" className="grow" onClick={() => exportData(JSON.stringify(store.state, null, 2))}>
+          <button type="button" className="grow" onClick={() => setExporting(true)}>
             Export JSON
           </button>
           <button
@@ -248,16 +250,69 @@ export function SetupView() {
           </button>
         </div>
       </Card>
+
+      {exporting && <ExportModal json={JSON.stringify(store.state, null, 2)} onClose={() => setExporting(false)} />}
     </>
   );
 }
 
-function exportData(json: string): void {
-  const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `training-tracker-${new Date().toISOString().slice(0, 10)}.json`;
-  link.click();
-  URL.revokeObjectURL(url);
+/** Embedded viewers block downloads, so a save button there would do nothing. */
+function canSaveFiles(): boolean {
+  try {
+    return window.self === window.top;
+  } catch {
+    return false; // Cross-origin frame — definitely embedded.
+  }
+}
+
+/**
+ * The data is always shown in full, ready to copy, so there is a way out even
+ * where saving a file is blocked.
+ */
+function ExportModal({ json, onClose }: { json: string; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(json);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard access can be refused; the textarea below is the fallback.
+      setCopied(false);
+    }
+  };
+
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `training-tracker-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <Modal title="Your data" onClose={onClose}>
+      <p className="small muted" style={{ marginTop: 0 }}>
+        Every plan, log and setting. Copy it somewhere safe, or save it as a file — keep it if you clear site
+        data or move to another browser.
+      </p>
+      <textarea
+        readOnly
+        value={json}
+        rows={10}
+        onFocus={(e) => e.currentTarget.select()}
+        style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 11.5, resize: 'vertical' }}
+      />
+      <div className="row" style={{ gap: 8, marginTop: 10 }}>
+        <button type="button" className="grow primary" onClick={copy}>
+          {copied ? 'Copied' : 'Copy to clipboard'}
+        </button>
+        {canSaveFiles() && (
+          <button type="button" className="grow" onClick={download}>Save as file</button>
+        )}
+      </div>
+    </Modal>
+  );
 }

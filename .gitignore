@@ -3,3 +3,4 @@ dist/
 build-tests/
 *.local
 .DS_Store
+dist-single/

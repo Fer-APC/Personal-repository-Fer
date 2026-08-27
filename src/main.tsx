@@ -12,7 +12,11 @@ createRoot(container).render(
   </StrictMode>,
 );
 
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+// The single-file build drops the manifest, and with it offline caching —
+// there are no separate asset URLs left for a service worker to cache.
+const installable = document.querySelector('link[rel="manifest"]');
+
+if ('serviceWorker' in navigator && import.meta.env.PROD && installable) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {
       // Offline support is a bonus; the app works without it.

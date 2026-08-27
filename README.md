@@ -38,6 +38,20 @@ top of the range clean. Volume you missed carries into next week; muscles you fl
 sore get less; three hard sessions in a row triggers a deload, as does your chosen
 cadence.
 
+## Getting to it
+
+**Hosted, right now** — open the published build on any device and use it as-is. Data
+stays in that browser.
+
+**Installed on your phone (recommended)** — enable GitHub Pages for this repo
+(Settings → Pages → Source: GitHub Actions). The workflow in
+`.github/workflows/deploy.yml` builds and publishes on every push to the app branch.
+Open the resulting URL on your phone and use "Add to Home Screen": you get an offline
+app icon, no browser chrome, and a service worker that keeps it working on the gym's
+dead wifi.
+
+**Locally** — see below.
+
 ## Running it
 
 ```bash
@@ -46,10 +60,13 @@ npm run dev        # development server
 npm run build      # production build into dist/
 npm run preview    # serve the production build
 npm test           # planner test suite
+npm run build:single   # one self-contained HTML file in dist-single/
 ```
 
-`dist/` is a static site — host it anywhere, or open it from a phone and use
-"Add to Home Screen" to install it.
+`dist/` is a static site — host it anywhere. `npm run build:single` instead produces a
+single self-contained HTML file with everything inlined, for hosts that supply their own
+page skeleton; that build has no service worker, since there are no separate asset URLs
+left to cache.
 
 ## How the planner works
 
