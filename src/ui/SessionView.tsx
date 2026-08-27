@@ -5,6 +5,7 @@ import { MUSCLE_LABEL } from '../domain/muscles';
 import { lastPerformance } from '../domain/progression';
 import { formatDayLabel, toISODate } from '../domain/date';
 import { ExercisePicker } from './ExercisePicker';
+import { VoiceCommand } from './VoiceCommand';
 import { Card, Chip, Field, NumberInput } from './components';
 import { AD_HOC_DAY, type Muscle, type PlannedExercise } from '../domain/types';
 
@@ -15,6 +16,7 @@ export function SessionView({ logId, onBack }: { logId: string; onBack: () => vo
   const log = store.logById(logId);
   const [showSoreness, setShowSoreness] = useState(false);
   const [picking, setPicking] = useState(false);
+  const [dictating, setDictating] = useState(false);
 
   if (!log) {
     return (
@@ -221,9 +223,14 @@ export function SessionView({ logId, onBack }: { logId: string; onBack: () => vo
         );
       })}
 
-      <button type="button" className="wide" style={{ marginBottom: 12 }} onClick={() => setPicking(true)}>
-        + Add an exercise
-      </button>
+      <div className="row" style={{ gap: 8, marginBottom: 12 }}>
+        <button type="button" className="grow" onClick={() => setPicking(true)}>
+          + Add an exercise
+        </button>
+        <button type="button" className="grow" onClick={() => setDictating(true)}>
+          🎤 Dictate
+        </button>
+      </div>
 
       <Card>
         <h3>Finish</h3>
@@ -264,6 +271,8 @@ export function SessionView({ logId, onBack }: { logId: string; onBack: () => vo
             : `${completionHint(log.sessionRpe)} Saving rebuilds the sessions you haven't done yet around what you actually did.`}
         </p>
       </Card>
+
+      {dictating && <VoiceCommand targetLogId={log.id} onClose={() => setDictating(false)} />}
 
       {picking && (
         <ExercisePicker

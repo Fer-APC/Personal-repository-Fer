@@ -42,6 +42,13 @@ passed lock in place, and whatever they didn't cover rolls forward.
 improvised one, work you added on top — by searching the exercise database. It counts
 toward the week the same as a planned session.
 
+**Takes dictation.** Tap the microphone and talk: "on Monday I did squats five sets of
+five at a hundred kilos, bench press three by eight at sixty, my hamstrings are sore,
+more calisthenics". It logs the sets against Monday, records the soreness, and shifts the
+goal mix — but it always shows what it understood and waits for you to confirm, because
+speech recognition misfires and a wrong weight in your log is worse than no log at all.
+Anything it could not parse is listed rather than guessed at.
+
 **Tells you where you stand.** "Where you are" shows sessions done, sets logged, the
 share of your weekly volume covered, and which muscles will still end the week short
 once your remaining sessions are accounted for.
@@ -94,6 +101,14 @@ The pipeline lives in `src/domain/` and runs in this order:
 | 4 | `planner.ts` | Fills each session slot by slot, greedily picking whatever best serves what's still owed |
 | 5 | `progression.ts` | Turns your logs into load suggestions, deficits, ladder steps and deload calls |
 | 6 | `progress.ts` | Scores the week in flight: what's logged, what's still scheduled, what will fall short |
+| 7 | `voice.ts` / `apply.ts` | Turns spoken sentences into typed commands, then applies them to the state |
+
+Dictation is parsed in the browser, with no model and no network call: `voice.ts` maps
+speech to a `Command[]`, and `apply.ts` is a pure function from `(state, commands)` to a
+new state, so every branch is testable without a browser. Speech arrives without
+punctuation, so a run of instructions is cut at exercise-name boundaries — keeping each
+set attached to the lift it was spoken with, rather than combining one exercise's name
+with another's numbers.
 
 Replanning runs the same pipeline with the trained days pinned. Their logged volume is
 subtracted from the weekly targets first, so the remaining sessions are built against

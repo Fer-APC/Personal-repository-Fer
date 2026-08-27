@@ -8,6 +8,7 @@ import { computeWeekProgress } from '../domain/progress';
 import { sessionIdFor } from '../domain/store';
 import { WEEKDAY_LABEL, addDays, formatDayLabel, fromISODate, toISODate, weekStartISO } from '../domain/date';
 import { Card, Chip, Modal } from './components';
+import { VoiceCommand } from './VoiceCommand';
 import { AD_HOC_DAY, type PlannedDay, type PlannedExercise } from '../domain/types';
 
 function formatReps(exercise: PlannedExercise): string {
@@ -26,6 +27,7 @@ function formatRest(seconds: number): string {
 export function WeekView({ onOpenSession }: { onOpenSession: (logId: string) => void }) {
   const store = useStore();
   const [weekStart, setWeekStart] = useState(() => weekStartISO(new Date()));
+  const [dictating, setDictating] = useState(false);
   const plan = store.planFor(weekStart);
   const today = toISODate(new Date());
 
@@ -58,6 +60,14 @@ export function WeekView({ onOpenSession }: { onOpenSession: (logId: string) => 
           </div>
         </div>
         <div className="row">
+          <button
+            type="button"
+            className="tiny-btn"
+            onClick={() => setDictating(true)}
+            aria-label="Dictate a change or a session"
+          >
+            🎤
+          </button>
           <button type="button" className="tiny-btn" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Previous week">‹</button>
           {!isThisWeek && (
             <button type="button" className="tiny-btn" onClick={() => setWeekStart(weekStartISO(new Date()))}>Today</button>
@@ -118,6 +128,8 @@ export function WeekView({ onOpenSession }: { onOpenSession: (logId: string) => 
           Shuffle this week
         </button>
       </div>
+
+      {dictating && <VoiceCommand onClose={() => setDictating(false)} />}
     </>
   );
 }

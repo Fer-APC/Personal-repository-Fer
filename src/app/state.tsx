@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import { adaptRemainingDays, defaultState, findLog, loadState, planWeek, saveState, sessionIdFor } from '../domain/store';
 import { EXERCISE_BY_ID } from '../domain/exercises';
 import { hasLoggedWork } from '../domain/progress';
+import { applyCommands } from '../domain/apply';
+import type { Command } from '../domain/voice';
 import { fromISODate, toISODate, weekStartISO } from '../domain/date';
 import { AD_HOC_DAY, type Activity, type AppState, type LoggedSet, type Profile, type SessionLog, type WeekPlan } from '../domain/types';
 
@@ -32,6 +34,8 @@ interface Store {
   updateSet: (id: string, exerciseIndex: number, setIndex: number, patch: Partial<LoggedSet>) => void;
   addSet: (id: string, exerciseIndex: number) => void;
   removeSet: (id: string, exerciseIndex: number) => void;
+  /** Applies dictated commands; returns what changed, for showing back. */
+  applyVoice: (commands: Command[], options: { today: string; targetLogId?: string }) => string[];
   completeOnboarding: () => void;
   resetAll: () => void;
 }
@@ -267,6 +271,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               : log,
           ),
         })),
+
+      applyVoice: (commands, options) => {
+        const result = applyCommands(state, commands, options);
+        setState(result.state);
+        return result.notes;
+      },
 
       completeOnboarding: () => setState((s) => ({ ...s, onboarded: true })),
 
