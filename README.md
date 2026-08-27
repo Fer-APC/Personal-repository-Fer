@@ -122,4 +122,16 @@ Calisthenics progressions chain through `progression` and `progressionStep`.
 ## Your data
 
 Stored in `localStorage` under `training-tracker/v1`, never sent anywhere. Setup → Export
-JSON writes a backup; Reset everything clears it.
+JSON shows it in full to copy, and saves it as a file where the browser allows downloads.
+
+Stored data carries a `version`, and `migrate` in `src/domain/store.ts` upgrades older
+shapes on load. Plans are derived data and are repaired from whatever they still carry;
+logged sessions and settings are never discarded. Data that cannot be parsed at all is
+moved aside under `training-tracker/v1.unreadable` rather than overwritten.
+
+**If you change the shape of anything stored, add a migration and a case to
+`tests/migration.test.ts`.** Every release has to open the previous release's data — a
+missing field crashes the app on load, and a local-first app that won't render is one
+you cannot get your history out of. `scripts/upgrade-smoke.mjs` drives that upgrade in a
+real browser. As a backstop, any render error shows a recovery screen offering the raw
+data to copy before anything is cleared.

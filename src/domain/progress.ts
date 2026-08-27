@@ -90,7 +90,7 @@ export function computeWeekProgress(plan: WeekPlan, logs: SessionLog[], today: s
 
   const round = (n: number) => Math.round(n * 2) / 2;
   const muscles: MuscleProgress[] = ALL_MUSCLES.map((muscle) => {
-    const target = plan.targets[muscle] ?? 0;
+    const target = plan.targets?.[muscle] ?? 0;
     const done = round(logged[muscle] ?? 0);
     const ahead = round(scheduled[muscle] ?? 0);
     return {

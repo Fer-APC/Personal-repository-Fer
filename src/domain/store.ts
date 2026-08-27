@@ -5,6 +5,8 @@ import { toISODate, weekStartISO } from './date';
 import type { AppState, Muscle, Profile, SessionLog, WeekPlan } from './types';
 
 const STORAGE_KEY = 'training-tracker/v1';
+/** Bumped whenever stored data needs upgrading; see `migrate`. */
+export const STATE_VERSION = 2;
 
 export const FULL_GYM: Profile['equipment'] = [
   'barbell', 'dumbbell', 'machine', 'cable', 'bench', 'pullup_bar', 'dip_bars', 'kettlebell', 'bands', 'bodyweight',
@@ -29,7 +31,7 @@ export function defaultProfile(): Profile {
 
 export function defaultState(): AppState {
   return {
-    version: 1,
+    version: STATE_VERSION,
     profile: defaultProfile(),
     activities: [],
     plans: {},
@@ -39,21 +41,59 @@ export function defaultState(): AppState {
   };
 }
 
+/**
+ * Brings a stored plan up to the current shape. Plans are derived data, so
+ * anything missing is rebuilt from what the plan does carry rather than
+ * discarded — losing a week's plan would take its logged sessions' context
+ * with it.
+ */
+function migratePlan(plan: WeekPlan): WeekPlan {
+  const balance = plan.balance ?? [];
+  return {
+    ...plan,
+    balance,
+    // v1 plans predate per-muscle targets; the balance rows still hold them.
+    targets: plan.targets ?? Object.fromEntries(balance.map((row) => [row.muscle, row.target])),
+    // v1 days predate template keys; an empty key falls back to position.
+    days: (plan.days ?? []).map((day) => ({ ...day, templateKey: day.templateKey ?? '' })),
+  };
+}
+
+export function migrate(parsed: Partial<AppState>): AppState {
+  const base = defaultState();
+  const plans = Object.fromEntries(
+    Object.entries(parsed.plans ?? {}).map(([week, plan]) => [week, migratePlan(plan)]),
+  );
+  return {
+    ...base,
+    ...parsed,
+    version: STATE_VERSION,
+    profile: { ...base.profile, ...parsed.profile },
+    plans,
+    logs: parsed.logs ?? [],
+    activities: parsed.activities ?? [],
+  };
+}
+
 export function loadState(): AppState {
+  let raw: string | null = null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultState();
-    const parsed = JSON.parse(raw) as Partial<AppState>;
-    const base = defaultState();
-    return {
-      ...base,
-      ...parsed,
-      profile: { ...base.profile, ...parsed.profile },
-      plans: parsed.plans ?? {},
-      logs: parsed.logs ?? [],
-      activities: parsed.activities ?? [],
-    };
+    raw = localStorage.getItem(STORAGE_KEY);
   } catch {
+    return defaultState(); // Storage blocked entirely; run for this session only.
+  }
+  if (!raw) return defaultState();
+
+  try {
+    return migrate(JSON.parse(raw) as Partial<AppState>);
+  } catch {
+    // Never silently overwrite data we failed to read — park it so it can be
+    // recovered by hand, and start clean.
+    try {
+      localStorage.setItem(`${STORAGE_KEY}.unreadable`, raw);
+    } catch {
+      // Nothing further to do; the original is still in place until saved over.
+    }
     return defaultState();
   }
 }

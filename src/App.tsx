@@ -5,6 +5,7 @@ import { SessionView } from './ui/SessionView';
 import { BalanceView } from './ui/BalanceView';
 import { SetupView } from './ui/SetupView';
 import { Onboarding } from './ui/Onboarding';
+import { ErrorBoundary } from './ui/ErrorBoundary';
 
 type Tab = 'week' | 'balance' | 'setup';
 
@@ -61,8 +62,10 @@ function TabButton({
 
 export default function App() {
   return (
-    <StoreProvider>
-      <Shell />
-    </StoreProvider>
+    <ErrorBoundary>
+      <StoreProvider>
+        <Shell />
+      </StoreProvider>
+    </ErrorBoundary>
   );
 }
