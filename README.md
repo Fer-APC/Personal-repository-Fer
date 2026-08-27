@@ -32,11 +32,25 @@ stacks the same muscle inside one superset.
 its target, separating direct work from assistance, and flags anything under-served,
 over-served, or missing entirely.
 
-**Adapts.** Log sets, reps, weight and RPE. Loads progress by double progression — fill
-the rep range, then add weight. Calisthenics ladders move up a step when you clear the
-top of the range clean. Volume you missed carries into next week; muscles you flag as
-sore get less; three hard sessions in a row triggers a deload, as does your chosen
-cadence.
+**Adapts within the week, not just between weeks.** Save a session and the days you
+haven't trained yet are rebuilt around what you actually did. Skip the lat work and it
+reappears later in the week; do an extra chest session and the remaining days stop
+prescribing chest. Sessions you've already trained are never touched. Days that have
+passed lock in place, and whatever they didn't cover rolls forward.
+
+**Takes sessions you did off-plan.** Log anything — a session at another gym, an
+improvised one, work you added on top — by searching the exercise database. It counts
+toward the week the same as a planned session.
+
+**Tells you where you stand.** "Where you are" shows sessions done, sets logged, the
+share of your weekly volume covered, and which muscles will still end the week short
+once your remaining sessions are accounted for.
+
+**Adapts between weeks too.** Loads progress by double progression — fill the rep range,
+then add weight. Calisthenics ladders move up a step when you clear the top of the range
+clean. Volume you missed carries into next week; muscles you flag as sore get less
+immediately and again next week; three hard sessions in a row triggers a deload, as does
+your chosen cadence.
 
 ## Getting to it
 
@@ -79,6 +93,16 @@ The pipeline lives in `src/domain/` and runs in this order:
 | 3 | `schedule.ts` | Best gym days by spacing and conflict, a split to match, and per-day joint/systemic budgets |
 | 4 | `planner.ts` | Fills each session slot by slot, greedily picking whatever best serves what's still owed |
 | 5 | `progression.ts` | Turns your logs into load suggestions, deficits, ladder steps and deload calls |
+| 6 | `progress.ts` | Scores the week in flight: what's logged, what's still scheduled, what will fall short |
+
+Replanning runs the same pipeline with the trained days pinned. Their logged volume is
+subtracted from the weekly targets first, so the remaining sessions are built against
+what is genuinely still owed — and set counts shrink when a muscle's work is already
+banked, rather than the session silently repeating volume you don't need.
+
+A week you join partway through only plans the days still ahead of it, with targets
+scaled to match, so joining on a Thursday doesn't report you as behind on sessions that
+were never possible.
 
 Exercise selection scores each candidate on the muscle demand still outstanding, goal
 fit, movement-pattern needs, superset legality, joint budgets and variety — then

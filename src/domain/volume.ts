@@ -44,6 +44,12 @@ export interface VolumeInputs {
   /** Reported soreness 0-3 from the most recent sessions. */
   soreness?: Partial<Record<Muscle, number>>;
   deload?: boolean;
+  /**
+   * Fraction of the week actually being planned, for a week joined partway
+   * through. Targets scale with it so a two-session week isn't judged against
+   * a three-session goal.
+   */
+  weekFraction?: number;
 }
 
 export function computeVolumeTargets(input: VolumeInputs): VolumeTargets {
@@ -76,6 +82,7 @@ export function computeVolumeTargets(input: VolumeInputs): VolumeTargets {
     if (deficit > 0) value += Math.min(4, deficit * 0.4);
 
     if (input.deload) value *= 0.55;
+    value *= input.weekFraction ?? 1;
 
     target[muscle] = Math.max(0, Math.round(value * 2) / 2);
     // Sport fatigue counts as partial stimulus for endurance-ish qualities only.
@@ -93,6 +100,12 @@ export function computeVolumeTargets(input: VolumeInputs): VolumeTargets {
     );
   }
   if (input.deload) notes.push('Deload week — volume cut by ~45% and target RPE dropped a point.');
+  const fraction = input.weekFraction ?? 1;
+  if (fraction < 1) {
+    notes.push(
+      `Only part of the week is left, so targets are scaled to the ${Math.round(fraction * 100)}% of it still ahead of you.`,
+    );
+  }
 
   return { target, credit, notes };
 }

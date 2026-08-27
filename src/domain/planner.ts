@@ -1,11 +1,11 @@
 import { ALL_MUSCLES, MUSCLE_REGION, RECOVERY_HOURS } from './muscles';
-import { availableExercises } from './exercises';
+import { EXERCISE_BY_ID, availableExercises } from './exercises';
 import { blendPrescription, blendedPatternBias, goalFitScore } from './goals';
 import { computeExternalLoad, type ExternalLoad } from './activities';
 import { computeVolumeTargets } from './volume';
 import { assignSplitToDays, chooseGymDays, chooseSplit, dayConstraints, describeDaySlots, type SplitDay } from './schedule';
 import { computeDeficits, decideDeload, ladderStepAllowed, recentSoreness, suggestLoad } from './progression';
-import { WEEKDAY_LABEL, addDays, dateOfWeekday } from './date';
+import { WEEKDAY_LABEL, addDays, dateOfWeekday, fromISODate, weekdayOf } from './date';
 import { MUSCLE_LABEL } from './muscles';
 import { ACTIVITY_LABEL } from './activities';
 import type {
@@ -47,6 +47,26 @@ export interface PlanInputs {
   /** First week the user ever planned — anchors the deload cadence. */
   anchorWeek?: string | null;
   seed?: number;
+  /**
+   * Revision mode. Given the plan being revised plus the indexes of days that
+   * are already done or under way, those days are carried over untouched and
+   * only the rest of the week is rebuilt.
+   */
+  basePlan?: WeekPlan;
+  lockedDayIndexes?: number[];
+  /**
+   * Volume already banked this week from logged sets, primary at full credit
+   * and assistance at half — the same currency as the weekly targets.
+   */
+  consumed?: Partial<Record<Muscle, number>>;
+  /** Muscles worked on each weekday so far, for recovery spacing. */
+  workedByWeekday?: { weekday: Weekday; muscles: Muscle[] }[];
+  /**
+   * The day the plan is being made from. Defaults to the start of the week;
+   * when revising mid-week it must be the current date, or soreness reported
+   * during the week reads as being in the future and is ignored.
+   */
+  today?: string;
 }
 
 interface DayBuildState {
@@ -88,6 +108,24 @@ function baseSets(exercise: Exercise, setMultiplier: number, deload: boolean): n
   const base = exercise.compound && exercise.systemicCost >= 1.5 ? 4 : 3;
   const scaled = base * setMultiplier * (deload ? 0.7 : 1);
   return Math.max(2, Math.min(5, Math.round(scaled)));
+}
+
+/**
+ * Trims an exercise down when its muscles barely need the work — because the
+ * volume is already banked this week, or because soreness cut the target. The
+ * movement stays in the session; only the volume gives way. Two sets is the
+ * floor: below that an exercise isn't worth its slot.
+ */
+function setsForExercise(
+  exercise: Exercise,
+  setMultiplier: number,
+  deload: boolean,
+  owedByMuscle: Partial<Record<Muscle, number>>,
+): number {
+  const base = baseSets(exercise, setMultiplier, deload);
+  const owed = Math.max(0, ...exercise.primary.map((m) => owedByMuscle[m] ?? 0));
+  if (owed >= base) return base;
+  return Math.max(2, Math.min(base, Math.round(owed)));
 }
 
 function coverage(exercise: Exercise, sets: number): Partial<Record<Muscle, number>> {
@@ -251,8 +289,19 @@ export function generateWeekPlan(input: PlanInputs): WeekPlan {
   const pastLogs = logs.filter((l) => l.weekStart < weekStart);
   const previousWeekLogs = logs.filter((l) => l.weekStart === lastWeekStart);
   const deloadDecision = decideDeload(profile, input.anchorWeek ?? null, weekStart, pastLogs);
-  const soreness = recentSoreness(logs, weekStart);
+  const soreness = recentSoreness(logs, input.today ?? weekStart);
   const deficits = computeDeficits(input.previousTargets, previousWeekLogs);
+
+  // A week joined partway through only gets the days that are still ahead.
+  const earliestWeekday =
+    input.today && input.today > weekStart && input.today < addDays(weekStart, 7)
+      ? weekdayOf(fromISODate(input.today))
+      : 0;
+
+  const split = chooseSplit(profile, load);
+  const gymDays = input.basePlan
+    ? input.basePlan.days.map((d) => d.weekday)
+    : chooseGymDays(profile, load, earliestWeekday);
 
   const volume = computeVolumeTargets({
     profile,
@@ -260,12 +309,21 @@ export function generateWeekPlan(input: PlanInputs): WeekPlan {
     deficits,
     soreness,
     deload: deloadDecision.deload,
+    weekFraction: input.basePlan ? 1 : Math.min(1, gymDays.length / profile.daysPerWeek),
   });
-
-  const gymDays = chooseGymDays(profile, load);
   const slots = describeDaySlots(gymDays, load);
-  const split = chooseSplit(profile, load);
-  const assignment = assignSplitToDays(split, slots);
+
+  // Revising keeps the existing day-to-template pairing so a day the user has
+  // already trained is not quietly relabelled underneath them.
+  const assignment = input.basePlan
+    ? input.basePlan.days.map((day, index) => ({
+        slot: slots[index]!,
+        template:
+          split.days.find((t) => t.key === day.templateKey) ?? split.days[index] ?? split.days[0]!,
+      }))
+    : assignSplitToDays(split, slots);
+
+  const locked = new Set(input.lockedDayIndexes ?? []);
 
   const pool = availableExercises(profile.equipment).filter((e) => ladderStepAllowed(e, logs, profile));
   const warnings: string[] = [];
@@ -273,12 +331,19 @@ export function generateWeekPlan(input: PlanInputs): WeekPlan {
 
   if (gymDays.length < profile.daysPerWeek) {
     warnings.push(
-      `You asked for ${profile.daysPerWeek} gym days but only ${gymDays.length} weekday${gymDays.length === 1 ? ' is' : 's are'} marked available.`,
+      earliestWeekday > 0
+        ? `Only ${gymDays.length} of your ${profile.daysPerWeek} gym days are left this week, so this week's targets are scaled down to match.`
+        : `You asked for ${profile.daysPerWeek} gym days but only ${gymDays.length} weekday${gymDays.length === 1 ? ' is' : 's are'} marked available.`,
     );
   }
 
-  // Demand vector consumed as the week is built.
+  // Demand vector consumed as the week is built. In revision mode it starts
+  // already reduced by whatever has actually been logged, so the remaining days
+  // are planned against what is genuinely still owed.
   const remaining: Partial<Record<Muscle, number>> = { ...volume.target };
+  for (const [muscle, amount] of Object.entries(input.consumed ?? {}) as [Muscle, number][]) {
+    remaining[muscle] = Math.max(0, (remaining[muscle] ?? 0) - amount);
+  }
   /** Sets where the muscle is the target. */
   const plannedPrimaryByMuscle: Partial<Record<Muscle, number>> = {};
   /** Sets where the muscle only assists. */
@@ -289,9 +354,26 @@ export function generateWeekPlan(input: PlanInputs): WeekPlan {
     previousWeekLogs.flatMap((l) => l.exercises.map((e) => e.exerciseId)),
   );
   /** weekday -> muscles hit hard, for recovery spacing inside the week. */
-  const hitOn: { weekday: Weekday; muscles: Muscle[] }[] = [];
+  const hitOn: { weekday: Weekday; muscles: Muscle[] }[] = [...(input.workedByWeekday ?? [])];
 
   const days: PlannedDay[] = assignment.map(({ slot, template }, dayIndex) => {
+    const carriedOver = locked.has(dayIndex) ? input.basePlan?.days[dayIndex] : undefined;
+    if (carriedOver) {
+      // Its real contribution is already in `consumed`; count only what the
+      // user actually logged, which `workedByWeekday` carries.
+      for (const exercise of carriedOver.exercises) {
+        const definition = EXERCISE_BY_ID[exercise.exerciseId];
+        if (!definition) continue;
+        for (const muscle of definition.primary) {
+          plannedPrimaryByMuscle[muscle] = (plannedPrimaryByMuscle[muscle] ?? 0) + exercise.sets;
+        }
+        for (const muscle of definition.secondary) {
+          plannedAssistByMuscle[muscle] = (plannedAssistByMuscle[muscle] ?? 0) + exercise.sets;
+        }
+        usedThisWeek.add(exercise.exerciseId);
+      }
+      return carriedOver;
+    }
     const constraints = dayConstraints(slot, load);
     const structure = profile.structures[dayIndex] ?? DEFAULT_STRUCTURE;
     const notes = [...constraints.notes];
@@ -367,7 +449,7 @@ export function generateWeekPlan(input: PlanInputs): WeekPlan {
         }
         if (!best) continue;
 
-        const sets = baseSets(best, prescription.setMultiplier, deloadDecision.deload);
+        const sets = setsForExercise(best, prescription.setMultiplier, deloadDecision.deload, remaining);
         const repRange = repsForExercise(best, prescription.compoundReps, prescription.isolationReps);
         const isLastOfBlock = position === block.size - 1;
         const restSec = isSuperset && !isLastOfBlock
@@ -437,6 +519,8 @@ export function generateWeekPlan(input: PlanInputs): WeekPlan {
       exercises,
       estimatedMinutes: estimateMinutes(exercises),
       notes,
+      templateKey: template.key,
+      ...(input.basePlan ? { adaptedFrom: new Date().toISOString() } : {}),
     } satisfies PlannedDay;
   });
 
@@ -476,6 +560,7 @@ export function generateWeekPlan(input: PlanInputs): WeekPlan {
     ratios,
     warnings,
     reasoning,
+    targets: volume.target,
   };
 }
 

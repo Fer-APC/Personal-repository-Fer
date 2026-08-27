@@ -8,28 +8,19 @@ import { Onboarding } from './ui/Onboarding';
 
 type Tab = 'week' | 'balance' | 'setup';
 
-interface OpenSession {
-  weekStart: string;
-  dayIndex: number;
-}
-
 function Shell() {
   const store = useStore();
   const [tab, setTab] = useState<Tab>('week');
-  const [session, setSession] = useState<OpenSession | null>(null);
+  const [openLogId, setOpenLogId] = useState<string | null>(null);
 
   if (!store.state.onboarded) {
     return <div className="app"><Onboarding /></div>;
   }
 
-  if (session) {
+  if (openLogId) {
     return (
       <div className="app">
-        <SessionView
-          weekStart={session.weekStart}
-          dayIndex={session.dayIndex}
-          onBack={() => setSession(null)}
-        />
+        <SessionView logId={openLogId} onBack={() => setOpenLogId(null)} />
       </div>
     );
   }
@@ -37,9 +28,7 @@ function Shell() {
   return (
     <>
       <div className="app">
-        {tab === 'week' && (
-          <WeekView onOpenSession={(weekStart, dayIndex) => setSession({ weekStart, dayIndex })} />
-        )}
+        {tab === 'week' && <WeekView onOpenSession={setOpenLogId} />}
         {tab === 'balance' && <BalanceView />}
         {tab === 'setup' && <SetupView />}
       </div>

@@ -103,6 +103,7 @@ const upperPlus: SplitDay = {
  */
 const skillBoost = (day: SplitDay): SplitDay => ({
   ...day,
+  key: `${day.key}+skill`,
   emphasis: { ...day.emphasis, ...boost(['abs', 'forearms', 'rotator_cuff'], 1.2) },
   required: [['skill'], ...day.required],
 });
@@ -186,8 +187,14 @@ export function scoreDaySet(days: Weekday[], load: ExternalLoad): number {
   return score;
 }
 
-export function chooseGymDays(profile: Profile, load: ExternalLoad): Weekday[] {
-  const available = ([0, 1, 2, 3, 4, 5, 6] as Weekday[]).filter((d) => profile.availability[d]);
+/**
+ * Picks the gym days. `earliestWeekday` drops days that have already passed,
+ * so a week planned on Thursday never schedules a session for Monday.
+ */
+export function chooseGymDays(profile: Profile, load: ExternalLoad, earliestWeekday = 0): Weekday[] {
+  const available = ([0, 1, 2, 3, 4, 5, 6] as Weekday[]).filter(
+    (d) => profile.availability[d] && d >= earliestWeekday,
+  );
   const k = Math.min(profile.daysPerWeek, available.length);
   if (k === 0) return [];
   const candidates = combinations(available, k);

@@ -4,9 +4,11 @@ import { EXERCISE_BY_ID } from '../domain/exercises';
 import { MUSCLE_LABEL } from '../domain/muscles';
 import { ACTIVITY_LABEL } from '../domain/activities';
 import { alternativesFor } from '../domain/swap';
+import { computeWeekProgress } from '../domain/progress';
+import { sessionIdFor } from '../domain/store';
 import { WEEKDAY_LABEL, addDays, formatDayLabel, fromISODate, toISODate, weekStartISO } from '../domain/date';
 import { Card, Chip, Modal } from './components';
-import type { PlannedDay, PlannedExercise } from '../domain/types';
+import { AD_HOC_DAY, type PlannedDay, type PlannedExercise } from '../domain/types';
 
 function formatReps(exercise: PlannedExercise): string {
   const timed = EXERCISE_BY_ID[exercise.exerciseId]?.loadType === 'time';
@@ -21,7 +23,7 @@ function formatRest(seconds: number): string {
   return rest === 0 ? `${minutes}min` : `${minutes}min ${rest}s`;
 }
 
-export function WeekView({ onOpenSession }: { onOpenSession: (weekStart: string, dayIndex: number) => void }) {
+export function WeekView({ onOpenSession }: { onOpenSession: (logId: string) => void }) {
   const store = useStore();
   const [weekStart, setWeekStart] = useState(() => weekStartISO(new Date()));
   const plan = store.planFor(weekStart);
@@ -98,6 +100,8 @@ export function WeekView({ onOpenSession }: { onOpenSession: (weekStart: string,
         )}
       </Card>
 
+      <ProgressCard weekStart={weekStart} today={today} onOpenSession={onOpenSession} />
+
       {plan.days.map((day, dayIndex) => (
         <DayCard
           key={day.date}
@@ -125,7 +129,7 @@ function DayCard({
   dayIndex: number;
   weekStart: string;
   isToday: boolean;
-  onOpenSession: (weekStart: string, dayIndex: number) => void;
+  onOpenSession: (logId: string) => void;
 }) {
   const store = useStore();
   const [swapping, setSwapping] = useState<number | null>(null);
@@ -142,7 +146,10 @@ function DayCard({
         </div>
         <div className="small muted">~{day.estimatedMinutes} min</div>
       </div>
-      <div className="small muted" style={{ marginBottom: 8 }}>{day.title}</div>
+      <div className="row between" style={{ marginBottom: 8 }}>
+        <span className="small muted">{day.title}</span>
+        {day.adaptedFrom && <Chip tone="accent">rebuilt from your logs</Chip>}
+      </div>
 
       <div className="row wrap" style={{ marginBottom: 6 }}>
         {day.emphasis.map((muscle) => <Chip key={muscle}>{MUSCLE_LABEL[muscle]}</Chip>)}
@@ -200,7 +207,10 @@ function DayCard({
         type="button"
         className={`wide ${doneSets > 0 ? '' : 'primary'}`}
         style={{ marginTop: 12 }}
-        onClick={() => onOpenSession(weekStart, dayIndex)}
+        onClick={() => {
+          store.startSession(weekStart, dayIndex);
+          onOpenSession(sessionIdFor(weekStart, dayIndex));
+        }}
       >
         {log?.completed ? 'Session complete — review' : doneSets > 0 ? `Continue (${doneSets} sets logged)` : 'Start session'}
       </button>
@@ -282,5 +292,110 @@ function SwapModal({
       </button>
       <p className="tiny muted">Banned exercises can be restored from Setup.</p>
     </Modal>
+  );
+}
+
+/**
+ * Where the week actually stands: what has been logged, what the remaining
+ * sessions still cover, and what will be left short if nothing changes.
+ */
+function ProgressCard({
+  weekStart, today, onOpenSession,
+}: {
+  weekStart: string;
+  today: string;
+  onOpenSession: (logId: string) => void;
+}) {
+  const store = useStore();
+  const plan = store.planFor(weekStart);
+  const progress = useMemo(
+    () => (plan ? computeWeekProgress(plan, store.state.logs, today) : null),
+    [plan, store.state.logs, today],
+  );
+  if (!plan || !progress) return null;
+
+  const extras = store.state.logs.filter(
+    (log) => log.weekStart === weekStart && log.dayIndex === AD_HOC_DAY,
+  );
+
+  const logSomethingElse = () => {
+    const id = store.addAdHocSession(weekStart, today, 'Session I did');
+    onOpenSession(id);
+  };
+
+  return (
+    <Card>
+      <div className="row between" style={{ marginBottom: 10 }}>
+        <h2 style={{ margin: 0 }}>Where you are</h2>
+        <Chip tone={progress.covered >= 0.9 ? 'good' : 'accent'}>
+          {Math.round(progress.covered * 100)}% of the week's volume
+        </Chip>
+      </div>
+
+      <div className="row between">
+        <div>
+          <div className="small muted">Sessions</div>
+          <strong>{progress.sessionsDone} / {progress.sessionsPlanned}</strong>
+        </div>
+        <div>
+          <div className="small muted">Sets logged</div>
+          <strong>{progress.setsLogged}</strong>
+        </div>
+        <div>
+          <div className="small muted">Still short on</div>
+          <strong>{progress.shortfalls.length}</strong>
+        </div>
+      </div>
+
+      {progress.shortfalls.length > 0 ? (
+        <>
+          <p className="small muted" style={{ marginBottom: 6 }}>
+            Even after the sessions you have left, these end the week under target:
+          </p>
+          <div className="row wrap">
+            {progress.shortfalls.slice(0, 6).map((row) => (
+              <Chip key={row.muscle} tone="warn">
+                {MUSCLE_LABEL[row.muscle]} −{row.shortfall}
+              </Chip>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p className="small muted" style={{ marginBottom: 6 }}>
+          {progress.setsLogged > 0
+            ? 'On track — the sessions you have left cover what your goals ask for.'
+            : "Nothing logged yet. The sessions below cover the week as planned."}
+        </p>
+      )}
+
+      {extras.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <h3>Sessions outside the plan</h3>
+          {extras.map((log) => (
+            <div key={log.id} className="list-item">
+              <div className="grow">
+                <div className="small">{log.title}</div>
+                <div className="tiny muted">
+                  {formatDayLabel(log.date)} · {log.exercises.reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0)} sets
+                </div>
+              </div>
+              <button type="button" className="tiny-btn" onClick={() => onOpenSession(log.id)}>open</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="row" style={{ gap: 8, marginTop: 12 }}>
+        <button type="button" className="grow" onClick={logSomethingElse}>
+          Log a session I did
+        </button>
+        <button type="button" className="grow" onClick={() => store.adaptRemaining(weekStart)}>
+          Update remaining days
+        </button>
+      </div>
+      <p className="tiny muted" style={{ margin: '8px 0 0' }}>
+        Sessions rebuild themselves when you save one, so this is only needed if you edited an old session.
+      </p>
+    </Card>
   );
 }

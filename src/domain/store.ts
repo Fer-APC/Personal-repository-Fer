@@ -1,6 +1,7 @@
 import { DEFAULT_GOALS } from './goals';
 import { DEFAULT_STRUCTURE, generateWeekPlan } from './planner';
-import { weekStartISO } from './date';
+import { consumedThisWeek, lockedDayIndexes, workedByWeekday } from './progress';
+import { toISODate, weekStartISO } from './date';
 import type { AppState, Muscle, Profile, SessionLog, WeekPlan } from './types';
 
 const STORAGE_KEY = 'training-tracker/v1';
@@ -72,7 +73,7 @@ export function anchorWeek(state: AppState): string | null {
 
 function targetsOf(plan: WeekPlan | undefined): Partial<Record<Muscle, number>> | undefined {
   if (!plan) return undefined;
-  return Object.fromEntries(plan.balance.map((b) => [b.muscle, b.target]));
+  return plan.targets ?? Object.fromEntries(plan.balance.map((b) => [b.muscle, b.target]));
 }
 
 /** Builds (or rebuilds) the plan for a week from current profile and activities. */
@@ -86,6 +87,7 @@ export function planWeek(state: AppState, weekStart: string, seed?: number): Wee
     previousTargets: targetsOf(previousWeek ? state.plans[previousWeek] : undefined),
     anchorWeek: anchorWeek(state) ?? weekStart,
     seed: seed ?? hashSeed(weekStart),
+    today: toISODate(new Date()),
   });
 }
 
@@ -100,6 +102,36 @@ function hashSeed(value: string): number {
 
 export function sessionIdFor(weekStart: string, dayIndex: number): string {
   return `${weekStart}#${dayIndex}`;
+}
+
+/**
+ * Rebuilds the days you haven't trained yet from what you actually logged.
+ * Sessions already done are carried over untouched; everything still ahead is
+ * planned against the volume genuinely left to do, so skipped work gets picked
+ * up and extra work is not repeated.
+ */
+export function adaptRemainingDays(state: AppState, weekStart: string, today = toISODate(new Date())): WeekPlan | null {
+  const plan = state.plans[weekStart];
+  if (!plan) return null;
+
+  const locked = lockedDayIndexes(plan, state.logs, today);
+  if (locked.length >= plan.days.length) return null; // nothing left to rebuild
+
+  const previousWeek = Object.keys(state.plans).filter((w) => w < weekStart).sort().pop();
+  return generateWeekPlan({
+    profile: state.profile,
+    activities: state.activities,
+    weekStart,
+    logs: state.logs,
+    previousTargets: targetsOf(previousWeek ? state.plans[previousWeek] : undefined),
+    anchorWeek: anchorWeek(state) ?? weekStart,
+    seed: hashSeed(`${weekStart}:adapt:${state.logs.length}`),
+    today,
+    basePlan: plan,
+    lockedDayIndexes: locked,
+    consumed: consumedThisWeek(state.logs, weekStart),
+    workedByWeekday: workedByWeekday(state.logs, weekStart),
+  });
 }
 
 export function findLog(state: AppState, weekStart: string, dayIndex: number): SessionLog | undefined {

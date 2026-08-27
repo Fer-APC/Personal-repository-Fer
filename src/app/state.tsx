@@ -1,7 +1,9 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { defaultState, findLog, loadState, planWeek, saveState, sessionIdFor } from '../domain/store';
+import { adaptRemainingDays, defaultState, findLog, loadState, planWeek, saveState, sessionIdFor } from '../domain/store';
 import { EXERCISE_BY_ID } from '../domain/exercises';
-import type { Activity, AppState, LoggedSet, Profile, SessionLog, WeekPlan } from '../domain/types';
+import { hasLoggedWork } from '../domain/progress';
+import { toISODate } from '../domain/date';
+import { AD_HOC_DAY, type Activity, type AppState, type LoggedSet, type Profile, type SessionLog, type WeekPlan } from '../domain/types';
 
 interface Store {
   state: AppState;
@@ -15,7 +17,14 @@ interface Store {
   isStale: (weekStart: string) => boolean;
   swapExercise: (weekStart: string, dayIndex: number, exerciseIndex: number, newId: string) => void;
   logFor: (weekStart: string, dayIndex: number) => SessionLog | undefined;
+  logById: (id: string) => SessionLog | undefined;
   startSession: (weekStart: string, dayIndex: number) => void;
+  /** Logs a session that was never in the plan. Returns its id. */
+  addAdHocSession: (weekStart: string, date: string, title: string) => string;
+  addExerciseToLog: (id: string, exerciseId: string) => void;
+  removeExerciseFromLog: (id: string, exerciseIndex: number) => void;
+  /** Rebuilds the days not yet trained from what has actually been logged. */
+  adaptRemaining: (weekStart: string) => void;
   updateLog: (id: string, patch: Partial<SessionLog>) => void;
   updateSet: (id: string, exerciseIndex: number, setIndex: number, patch: Partial<LoggedSet>) => void;
   addSet: (id: string, exerciseIndex: number) => void;
@@ -96,6 +105,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
       logFor: (weekStart, dayIndex) => findLog(state, weekStart, dayIndex),
 
+      logById: (id) => state.logs.find((l) => l.id === id),
+
       startSession: (weekStart, dayIndex) =>
         setState((s) => {
           const id = sessionIdFor(weekStart, dayIndex);
@@ -120,8 +131,72 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           return { ...s, logs: [...s.logs, log] };
         }),
 
+      addAdHocSession: (weekStart, date, title) => {
+        const id = `${weekStart}#extra-${Date.now().toString(36)}`;
+        setState((s) => ({
+          ...s,
+          logs: [
+            ...s.logs,
+            {
+              id,
+              weekStart,
+              date,
+              dayIndex: AD_HOC_DAY,
+              title,
+              completed: false,
+              sessionRpe: null,
+              durationMin: null,
+              soreness: {},
+              exercises: [],
+            },
+          ],
+        }));
+        return id;
+      },
+
+      addExerciseToLog: (id, exerciseId) =>
+        setState((s) => ({
+          ...s,
+          logs: s.logs.map((log) =>
+            log.id === id
+              ? {
+                  ...log,
+                  exercises: [
+                    ...log.exercises,
+                    { exerciseId, sets: Array.from({ length: 3 }, () => emptySet()) },
+                  ],
+                }
+              : log,
+          ),
+        })),
+
+      removeExerciseFromLog: (id, exerciseIndex) =>
+        setState((s) => ({
+          ...s,
+          logs: s.logs.map((log) =>
+            log.id === id
+              ? { ...log, exercises: log.exercises.filter((_, i) => i !== exerciseIndex) }
+              : log,
+          ),
+        })),
+
+      adaptRemaining: (weekStart) =>
+        setState((s) => {
+          const revised = adaptRemainingDays(s, weekStart);
+          return revised ? { ...s, plans: { ...s.plans, [weekStart]: revised } } : s;
+        }),
+
       updateLog: (id, patch) =>
-        setState((s) => ({ ...s, logs: s.logs.map((l) => (l.id === id ? { ...l, ...patch } : l)) })),
+        setState((s) => {
+          const logs = s.logs.map((l) => (l.id === id ? { ...l, ...patch } : l));
+          const log = logs.find((l) => l.id === id);
+          // Finishing a session is the moment the rest of the week should
+          // react to what actually happened in it.
+          if (!log || !patch.completed || !hasLoggedWork(log)) return { ...s, logs };
+          const next = { ...s, logs };
+          const revised = adaptRemainingDays(next, log.weekStart, toISODate(new Date()));
+          return revised ? { ...next, plans: { ...next.plans, [log.weekStart]: revised } } : next;
+        }),
 
       updateSet: (id, exerciseIndex, setIndex, patch) =>
         setState((s) => ({

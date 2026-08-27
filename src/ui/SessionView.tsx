@@ -1,42 +1,37 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useStore } from '../app/state';
 import { EXERCISE_BY_ID } from '../domain/exercises';
 import { MUSCLE_LABEL } from '../domain/muscles';
 import { lastPerformance } from '../domain/progression';
 import { formatDayLabel } from '../domain/date';
+import { ExercisePicker } from './ExercisePicker';
 import { Card, Chip, NumberInput } from './components';
-import type { Muscle } from '../domain/types';
+import { AD_HOC_DAY, type Muscle, type PlannedExercise } from '../domain/types';
 
 const SORENESS_CHECK: Muscle[] = ['quads', 'hamstrings', 'calves', 'glutes', 'chest', 'lats', 'front_delts', 'lower_back'];
 
-export function SessionView({
-  weekStart, dayIndex, onBack,
-}: {
-  weekStart: string;
-  dayIndex: number;
-  onBack: () => void;
-}) {
+export function SessionView({ logId, onBack }: { logId: string; onBack: () => void }) {
   const store = useStore();
-  const plan = store.planFor(weekStart);
-  const day = plan?.days[dayIndex];
-  const log = store.logFor(weekStart, dayIndex);
+  const log = store.logById(logId);
   const [showSoreness, setShowSoreness] = useState(false);
-  const hasPlannedDay = !!day;
+  const [picking, setPicking] = useState(false);
 
-  useEffect(() => {
-    if (hasPlannedDay) store.startSession(weekStart, dayIndex);
-  }, [hasPlannedDay, weekStart, dayIndex, store]);
-
-  if (!day || !plan) {
+  if (!log) {
     return (
       <div className="empty">
-        That session is no longer in the plan.
+        That session is gone.
         <div style={{ marginTop: 12 }}><button type="button" onClick={onBack}>Back</button></div>
       </div>
     );
   }
 
-  if (!log) return <div className="empty">Preparing your session…</div>;
+  const plannedDay = log.dayIndex === AD_HOC_DAY
+    ? undefined
+    : store.planFor(log.weekStart)?.days[log.dayIndex];
+
+  /** Planned prescription for a logged exercise, matched by id not position. */
+  const prescriptionFor = (exerciseId: string): PlannedExercise | undefined =>
+    plannedDay?.exercises.find((e) => e.exerciseId === exerciseId);
 
   const totalSets = log.exercises.reduce((n, e) => n + e.sets.length, 0);
   const doneSets = log.exercises.reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0);
@@ -49,8 +44,8 @@ export function SessionView({
     <>
       <div className="topbar">
         <div>
-          <h1>{formatDayLabel(day.date)}</h1>
-          <div className="sub">{day.title}</div>
+          <h1>{formatDayLabel(log.date)}</h1>
+          <div className="sub">{log.title}</div>
         </div>
         <button type="button" className="tiny-btn" onClick={onBack}>Done</button>
       </div>
@@ -74,7 +69,7 @@ export function SessionView({
           <div style={{ marginTop: 12 }}>
             <h3>How sore are you today?</h3>
             <p className="tiny muted" style={{ marginTop: -4 }}>
-              Anything you mark 2+ gets less volume in next week's plan.
+              Anything you mark 2+ gets less volume for the rest of this week and the next.
             </p>
             {SORENESS_CHECK.map((muscle) => (
               <div key={muscle} className="row between" style={{ padding: '4px 0' }}>
@@ -98,8 +93,16 @@ export function SessionView({
         )}
       </Card>
 
+      {log.exercises.length === 0 && (
+        <Card>
+          <p className="small muted" style={{ margin: 0 }}>
+            Nothing logged yet. Add the exercises you did — order doesn't matter.
+          </p>
+        </Card>
+      )}
+
       {log.exercises.map((entry, exerciseIndex) => {
-        const planned = day.exercises[exerciseIndex];
+        const planned = prescriptionFor(entry.exerciseId);
         const definition = EXERCISE_BY_ID[entry.exerciseId];
         const timed = definition?.loadType === 'time';
         const history = lastPerformance(
@@ -110,12 +113,26 @@ export function SessionView({
           <Card key={`${entry.exerciseId}-${exerciseIndex}`}>
             <div className="row between" style={{ marginBottom: 2 }}>
               <strong>{definition?.name ?? entry.exerciseId}</strong>
-              {planned && <Chip tone="accent">{planned.slot}</Chip>}
+              <div className="row" style={{ gap: 6 }}>
+                {planned && <Chip tone="accent">{planned.slot}</Chip>}
+                <button
+                  type="button"
+                  className="tiny-btn danger"
+                  aria-label={`Remove ${definition?.name ?? 'exercise'}`}
+                  onClick={() => store.removeExerciseFromLog(log.id, exerciseIndex)}
+                >
+                  ×
+                </button>
+              </div>
             </div>
-            {planned && (
+            {planned ? (
               <div className="small muted" style={{ marginBottom: 8 }}>
                 Target {planned.sets} × {planned.repRange[0]}-{planned.repRange[1]}{timed ? 's' : ''} @ RPE {planned.rpe}
                 {planned.load.kg != null ? ` · ${planned.load.kg}kg` : ''}
+              </div>
+            ) : (
+              <div className="small muted" style={{ marginBottom: 8 }}>
+                {definition?.primary.map((m) => MUSCLE_LABEL[m]).join(', ')}
               </div>
             )}
             {history && (
@@ -178,6 +195,10 @@ export function SessionView({
         );
       })}
 
+      <button type="button" className="wide" style={{ marginBottom: 12 }} onClick={() => setPicking(true)}>
+        + Add an exercise
+      </button>
+
       <Card>
         <h3>Finish</h3>
         <div className="row" style={{ gap: 10 }}>
@@ -195,7 +216,7 @@ export function SessionView({
             <NumberInput
               value={log.durationMin}
               onChange={(value) => store.updateLog(log.id, { durationMin: value })}
-              placeholder={String(day.estimatedMinutes)}
+              placeholder={plannedDay ? String(plannedDay.estimatedMinutes) : '60'}
             />
           </label>
         </div>
@@ -203,24 +224,39 @@ export function SessionView({
           type="button"
           className="wide primary"
           style={{ marginTop: 12 }}
+          disabled={doneSets === 0 && !log.completed}
           onClick={() => {
             store.updateLog(log.id, { completed: !log.completed });
             if (!log.completed) onBack();
           }}
         >
-          {log.completed ? 'Reopen session' : 'Mark session complete'}
+          {log.completed ? 'Reopen session' : 'Save and update my week'}
         </button>
         <p className="tiny muted" style={{ marginBottom: 0 }}>
-          {completionHint(log.sessionRpe)}
+          {doneSets === 0 && !log.completed
+            ? 'Tick off at least one set to save this session.'
+            : `${completionHint(log.sessionRpe)} Saving rebuilds the sessions you haven't done yet around what you actually did.`}
         </p>
       </Card>
+
+      {picking && (
+        <ExercisePicker
+          equipment={store.state.profile.equipment}
+          exclude={log.exercises.map((e) => e.exerciseId)}
+          onPick={(exercise) => {
+            store.addExerciseToLog(log.id, exercise.id);
+            setPicking(false);
+          }}
+          onClose={() => setPicking(false)}
+        />
+      )}
     </>
   );
 }
 
 function completionHint(sessionRpe: number | null): string {
   if (sessionRpe == null) return 'Logging session RPE lets the planner spot when you need a lighter week.';
-  if (sessionRpe >= 9) return 'That was hard. Three of these in a row and next week is automatically a deload.';
-  if (sessionRpe <= 6) return 'That was easy — loads will step up next week.';
+  if (sessionRpe >= 9) return 'That was hard — three in a row and next week becomes a deload.';
+  if (sessionRpe <= 6) return 'That was easy, so loads will step up.';
   return 'Right in the productive range.';
 }

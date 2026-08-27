@@ -151,11 +151,15 @@ export interface PlannedExercise {
 export interface PlannedDay {
   date: string; // ISO yyyy-mm-dd
   weekday: Weekday;
+  /** Split template this day was built from, so it can be rebuilt in place. */
+  templateKey: string;
   title: string;
   emphasis: Muscle[];
   exercises: PlannedExercise[];
   estimatedMinutes: number;
   notes: string[];
+  /** Set when the day was rebuilt from work already logged this week. */
+  adaptedFrom?: string;
 }
 
 export interface BalanceRow {
@@ -180,6 +184,8 @@ export interface WeekPlan {
   balance: BalanceRow[];
   ratios: { pushPull: number; upperLower: number };
   warnings: string[];
+  /** Per-muscle weekly targets, kept so later revisions can reuse them. */
+  targets: Partial<Record<Muscle, number>>;
   /** Free-text explanation of the scheduling decisions. */
   reasoning: string[];
 }
@@ -199,10 +205,14 @@ export interface LoggedExercise {
   note?: string;
 }
 
+/** Day index used by sessions that were logged outside the plan. */
+export const AD_HOC_DAY = -1;
+
 export interface SessionLog {
   id: string;
   weekStart: string;
   date: string;
+  /** Index into the week's planned days, or AD_HOC_DAY for an unplanned one. */
   dayIndex: number;
   title: string;
   exercises: LoggedExercise[];

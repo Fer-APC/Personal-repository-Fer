@@ -1,16 +1,37 @@
+/** Prints a generated week to the terminal — handy when tuning the planner. */
 import { generateWeekPlan } from '../src/domain/planner';
+import { computeWeekProgress } from '../src/domain/progress';
 import { EXERCISE_BY_ID } from '../src/domain/exercises';
-import { normaliseGoals } from '../src/domain/goals';
-import { makeProfile, RUNS_AND_VOLLEY } from '../tests/fixtures';
+import { MUSCLE_LABEL } from '../src/domain/muscles';
 import { WEEKDAY_LABEL } from '../src/domain/date';
+import { makeProfile, RUNS_AND_VOLLEY } from '../tests/fixtures';
 
-const goals = normaliseGoals({ hypertrophy: 0.1, strength: 0.1, calisthenics: 0.7, endurance: 0.05, longevity: 0.05 });
-const plan = generateWeekPlan({ profile: makeProfile({ goals }), activities: RUNS_AND_VOLLEY, weekStart: '2026-08-24', logs: [], seed: 7 });
-console.log('SPLIT:', plan.splitName);
+const weekStart = process.argv[2] ?? '2026-08-24';
+const plan = generateWeekPlan({
+  profile: makeProfile(),
+  activities: RUNS_AND_VOLLEY,
+  weekStart,
+  logs: [],
+  seed: 11,
+  today: weekStart,
+});
+
+console.log(`SPLIT: ${plan.splitName}${plan.deload ? ' (deload)' : ''}`);
+plan.reasoning.forEach((line) => console.log(' •', line));
+
 for (const day of plan.days) {
-  console.log(`── ${WEEKDAY_LABEL[day.weekday]} · ${day.title}`);
-  for (const e of day.exercises) {
-    const ex = EXERCISE_BY_ID[e.exerciseId]!;
-    console.log(`   ${e.slot.padEnd(3)} ${ex.name.padEnd(32)} [${ex.pattern}] load=${ex.loadType}`);
+  console.log(`\n── ${WEEKDAY_LABEL[day.weekday]} · ${day.title} · ~${day.estimatedMinutes}min`);
+  for (const exercise of day.exercises) {
+    const definition = EXERCISE_BY_ID[exercise.exerciseId]!;
+    const timed = definition.loadType === 'time' ? 's' : '';
+    console.log(
+      `   ${exercise.slot.padEnd(3)} ${definition.name.padEnd(32)} ` +
+        `${exercise.sets}×${exercise.repRange[0]}-${exercise.repRange[1]}${timed}  rest ${exercise.restSec}s  @RPE${exercise.rpe}`,
+    );
   }
+  day.notes.forEach((note) => console.log(`       ! ${note}`));
 }
+
+const progress = computeWeekProgress(plan, [], weekStart);
+console.log('\nSHORTFALLS:', progress.shortfalls.map((s) => `${MUSCLE_LABEL[s.muscle]} -${s.shortfall}`).join(', ') || 'none');
+console.log('WARNINGS:', plan.warnings.join(' | ') || 'none');
