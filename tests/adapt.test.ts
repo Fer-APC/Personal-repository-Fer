@@ -160,7 +160,7 @@ test('an unplanned session counts toward the week even with no planned day logge
     ],
   });
 
-  const progress = computeWeekProgress(original, state.logs, original.days[0]!.date);
+  const progress = computeWeekProgress(original, state.logs, original.days[0]!.date, 3);
   const lats = progress.muscles.find((m) => m.muscle === 'lats')!;
   assert.ok(lats.logged >= 5, `lat work should be counted, got ${lats.logged}`);
   assert.equal(progress.setsLogged, 10);
@@ -232,7 +232,7 @@ test('replanning leaves the week structurally intact', () => {
 test('progress reports what the rest of the week will not cover', () => {
   const state = baseState();
   const plan = state.plans[WEEK]!;
-  const progress = computeWeekProgress(plan, state.logs, plan.days[0]!.date);
+  const progress = computeWeekProgress(plan, state.logs, plan.days[0]!.date, 3);
   assert.equal(progress.setsLogged, 0);
   assert.equal(progress.covered, 0);
   for (const muscle of progress.muscles) {
@@ -273,7 +273,7 @@ test('joining late does not report the whole week as missed', () => {
   const profile = makeProfile();
   const thursday = '2026-08-27';
   const plan = generateWeekPlan({ profile, activities: [], weekStart: WEEK, logs: [], seed: 5, today: thursday });
-  const progress = computeWeekProgress(plan, [], thursday);
+  const progress = computeWeekProgress(plan, [], thursday, 3);
   assert.ok(
     progress.shortfalls.length <= 5,
     `a fresh mid-week plan should be broadly achievable, got ${progress.shortfalls.length} shortfalls`,
@@ -308,7 +308,7 @@ test('a session logged for an earlier day counts toward that day\'s week', () =>
   });
 
   // Standing on Thursday, Monday is in the past — it must still be counted.
-  const progress = computeWeekProgress(plan, state.logs, thursday);
+  const progress = computeWeekProgress(plan, state.logs, thursday, 3);
   assert.equal(progress.setsLogged, 8);
   assert.ok(progress.muscles.find((m) => m.muscle === 'chest')!.logged >= 4);
   assert.ok(progress.muscles.find((m) => m.muscle === 'lats')!.logged >= 4);
@@ -325,4 +325,59 @@ test('a session logged for an earlier day counts toward that day\'s week', () =>
     chestSets(revised) < chestSets(bare),
     'work logged on a past day should still lighten the days ahead',
   );
+});
+
+test('sessions are counted against your weekly target, not inflated by logging', () => {
+  // Two days a week configured, two sessions logged outside the plan, standing
+  // on the last day of the week with one planned session still listed.
+  const state = baseState();
+  state.profile = { ...state.profile, daysPerWeek: 2, structures: state.profile.structures.slice(0, 2) };
+  const sunday = '2026-08-30';
+
+  for (const date of [WEEK, '2026-08-26']) {
+    state.logs.push({
+      id: `${WEEK}#extra-${date}`,
+      weekStart: WEEK,
+      date,
+      dayIndex: AD_HOC_DAY,
+      title: 'Session I did',
+      completed: true,
+      sessionRpe: 8,
+      durationMin: 60,
+      soreness: {},
+      exercises: [{ exerciseId: 'bb_bench', sets: Array.from({ length: 3 }, () => doneSet()) }],
+    });
+  }
+
+  const progress = computeWeekProgress(state.plans[WEEK]!, state.logs, sunday, state.profile.daysPerWeek);
+
+  assert.equal(progress.sessionsDone, 2, 'both logged sessions count as done');
+  assert.equal(progress.sessionsTarget, 2, 'the target is the days per week you asked for');
+  assert.ok(
+    progress.sessionsDone >= progress.sessionsTarget,
+    'having trained twice on a two-day week must read as complete, never as 2 of 3',
+  );
+});
+
+test('logging more sessions never raises the target', () => {
+  const state = baseState();
+  const target = state.profile.daysPerWeek;
+  const before = computeWeekProgress(state.plans[WEEK]!, state.logs, WEEK, target);
+
+  state.logs.push({
+    id: `${WEEK}#extra-more`,
+    weekStart: WEEK,
+    date: WEEK,
+    dayIndex: AD_HOC_DAY,
+    title: 'Bonus session',
+    completed: true,
+    sessionRpe: 7,
+    durationMin: 30,
+    soreness: {},
+    exercises: [{ exerciseId: 'bb_curl', sets: [doneSet()] }],
+  });
+  const after = computeWeekProgress(state.plans[WEEK]!, state.logs, WEEK, target);
+
+  assert.equal(after.sessionsTarget, before.sessionsTarget, 'the target must not move');
+  assert.equal(after.sessionsDone, before.sessionsDone + 1);
 });

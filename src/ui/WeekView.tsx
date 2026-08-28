@@ -47,6 +47,12 @@ export function WeekView({ onOpenSession }: { onOpenSession: (logId: string) => 
     return <div className="empty">Building your week…</div>;
   }
 
+  // Sessions beyond your weekly target are offered, not required.
+  const sessionsDone = store.state.logs.filter(
+    (log) => log.weekStart === weekStart && (log.completed || log.exercises.some((e) => e.sets.some((s) => s.done))),
+  ).length;
+  const targetAlreadyMet = sessionsDone >= store.state.profile.daysPerWeek;
+
   const isThisWeek = weekStart === weekStartISO(new Date());
 
   return (
@@ -119,6 +125,7 @@ export function WeekView({ onOpenSession }: { onOpenSession: (logId: string) => 
           dayIndex={dayIndex}
           weekStart={weekStart}
           isToday={day.date === today}
+          targetAlreadyMet={targetAlreadyMet}
           onOpenSession={onOpenSession}
         />
       ))}
@@ -135,12 +142,13 @@ export function WeekView({ onOpenSession }: { onOpenSession: (logId: string) => 
 }
 
 function DayCard({
-  day, dayIndex, weekStart, isToday, onOpenSession,
+  day, dayIndex, weekStart, isToday, targetAlreadyMet, onOpenSession,
 }: {
   day: PlannedDay;
   dayIndex: number;
   weekStart: string;
   isToday: boolean;
+  targetAlreadyMet: boolean;
   onOpenSession: (logId: string) => void;
 }) {
   const store = useStore();
@@ -148,6 +156,7 @@ function DayCard({
   const log = store.logFor(weekStart, dayIndex);
   const doneSets = log?.exercises.reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0) ?? 0;
   const newLifts = day.exercises.filter((e) => e.load.hint === 'first_time').length;
+  const isExtra = targetAlreadyMet && doneSets === 0;
 
   return (
     <Card>
@@ -155,6 +164,7 @@ function DayCard({
         <div className="weekday">
           {formatDayLabel(day.date)}
           {isToday ? <Chip tone="accent">today</Chip> : null}
+          {isExtra ? <Chip>optional extra</Chip> : null}
         </div>
         <div className="small muted">~{day.estimatedMinutes} min</div>
       </div>
@@ -321,10 +331,12 @@ function ProgressCard({
   const store = useStore();
   const plan = store.planFor(weekStart);
   const progress = useMemo(
-    () => (plan ? computeWeekProgress(plan, store.state.logs, today) : null),
-    [plan, store.state.logs, today],
+    () => (plan ? computeWeekProgress(plan, store.state.logs, today, store.state.profile.daysPerWeek) : null),
+    [plan, store.state.logs, today, store.state.profile.daysPerWeek],
   );
   if (!plan || !progress) return null;
+
+  const targetMet = !!progress && progress.sessionsDone >= progress.sessionsTarget;
 
   const extras = store.state.logs.filter(
     (log) => log.weekStart === weekStart && log.dayIndex === AD_HOC_DAY,
@@ -347,7 +359,7 @@ function ProgressCard({
       <div className="row between">
         <div>
           <div className="small muted">Sessions</div>
-          <strong>{progress.sessionsDone} / {progress.sessionsPlanned}</strong>
+          <strong>{progress.sessionsDone} / {progress.sessionsTarget}</strong>
         </div>
         <div>
           <div className="small muted">Sets logged</div>
@@ -358,6 +370,15 @@ function ProgressCard({
           <strong>{progress.shortfalls.length}</strong>
         </div>
       </div>
+
+      {targetMet && progress.sessionsRemaining > 0 && (
+        <p className="small muted" style={{ marginBottom: 6 }}>
+          You have already trained your {progress.sessionsTarget} sessions this week. The{' '}
+          {progress.sessionsRemaining === 1 ? 'session' : `${progress.sessionsRemaining} sessions`} below{' '}
+          {progress.sessionsRemaining === 1 ? 'is' : 'are'} extra — do{' '}
+          {progress.sessionsRemaining === 1 ? 'it' : 'them'} only if you want to.
+        </p>
+      )}
 
       {progress.shortfalls.length > 0 ? (
         <>

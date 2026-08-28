@@ -2,7 +2,7 @@ import { ALL_MUSCLES } from './muscles';
 import { EXERCISE_BY_ID } from './exercises';
 import { completedSetsByMuscle } from './progression';
 import { weekdayOf, fromISODate } from './date';
-import { AD_HOC_DAY, type Muscle, type SessionLog, type WeekPlan, type Weekday } from './types';
+import type { Muscle, SessionLog, WeekPlan, Weekday } from './types';
 
 export interface MuscleProgress {
   muscle: Muscle;
@@ -18,8 +18,12 @@ export interface MuscleProgress {
 
 export interface WeekProgress {
   muscles: MuscleProgress[];
+  /** Sessions actually trained this week, planned or not. */
   sessionsDone: number;
-  sessionsPlanned: number;
+  /** Gym days a week you asked for — what "done" is measured against. */
+  sessionsTarget: number;
+  /** Planned sessions still ahead of you. */
+  sessionsRemaining: number;
   setsLogged: number;
   /** Share of the week's total target already logged, 0-1. */
   covered: number;
@@ -67,7 +71,12 @@ export function consumedThisWeek(logs: SessionLog[], weekStart: string): Partial
   return completedSetsByMuscle(weekLogs(logs, weekStart));
 }
 
-export function computeWeekProgress(plan: WeekPlan, logs: SessionLog[], today: string): WeekProgress {
+export function computeWeekProgress(
+  plan: WeekPlan,
+  logs: SessionLog[],
+  today: string,
+  sessionsTarget: number,
+): WeekProgress {
   const week = weekLogs(logs, plan.weekStart);
   const logged = consumedThisWeek(logs, plan.weekStart);
   const locked = new Set(lockedDayIndexes(plan, logs, today));
@@ -112,7 +121,8 @@ export function computeWeekProgress(plan: WeekPlan, logs: SessionLog[], today: s
   return {
     muscles,
     sessionsDone: week.filter((l) => l.completed || hasLoggedWork(l)).length,
-    sessionsPlanned: plan.days.length + week.filter((l) => l.dayIndex === AD_HOC_DAY).length,
+    sessionsTarget,
+    sessionsRemaining: plan.days.filter((_, index) => !locked.has(index)).length,
     setsLogged,
     covered: totalTarget > 0 ? Math.min(1, totalLogged / totalTarget) : 0,
     shortfalls: muscles

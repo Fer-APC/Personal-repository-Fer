@@ -65,7 +65,7 @@ test('dictated volume counts toward the week and lightens what is left', () => {
   const before = baseState();
   const { state } = say(before, 'bench press 4 sets of 10 at 60 and cable fly 4 sets of 12 at 20');
 
-  const progress = computeWeekProgress(state.plans[WEEK]!, state.logs, TODAY);
+  const progress = computeWeekProgress(state.plans[WEEK]!, state.logs, TODAY, 3);
   assert.equal(progress.setsLogged, 8);
   assert.ok(progress.muscles.find((m) => m.muscle === 'chest')!.logged >= 8);
 });

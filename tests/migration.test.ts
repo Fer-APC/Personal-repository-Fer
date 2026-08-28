@@ -54,7 +54,7 @@ test('a state saved by the previous release loads and renders', () => {
   }
 
   // The exact call that used to crash on old data.
-  const progress = computeWeekProgress(plan, migrated.logs, WEEK);
+  const progress = computeWeekProgress(plan, migrated.logs, WEEK, 3);
   assert.ok(progress.muscles.length > 0);
   assert.equal(progress.setsLogged, 0);
 });
@@ -90,7 +90,7 @@ test('a plan with no balance rows at all still migrates', () => {
   const migrated = migrate({ plans: { [WEEK]: plan as WeekPlan } });
   assert.deepEqual(migrated.plans[WEEK]!.targets, {});
   assert.deepEqual(migrated.plans[WEEK]!.balance, []);
-  assert.doesNotThrow(() => computeWeekProgress(migrated.plans[WEEK]!, [], WEEK));
+  assert.doesNotThrow(() => computeWeekProgress(migrated.plans[WEEK]!, [], WEEK, 3));
 });
 
 test('empty and partial states fall back to defaults', () => {
