@@ -381,3 +381,35 @@ test('logging more sessions never raises the target', () => {
   assert.equal(after.sessionsTarget, before.sessionsTarget, 'the target must not move');
   assert.equal(after.sessionsDone, before.sessionsDone + 1);
 });
+
+test('the balance reports the sets the session actually prescribes', () => {
+  // A short session gets sets trimmed to fit; the coverage report has to
+  // reflect the trim, or it credits volume the plan no longer asks for.
+  const short = generateWeekPlan({
+    profile: makeProfile({ sessionMinutes: 30 }),
+    activities: [],
+    weekStart: WEEK,
+    logs: [],
+    seed: 6,
+    today: WEEK,
+  });
+  const long = generateWeekPlan({
+    profile: makeProfile({ sessionMinutes: 90 }),
+    activities: [],
+    weekStart: WEEK,
+    logs: [],
+    seed: 6,
+    today: WEEK,
+  });
+
+  const setsIn = (plan: WeekPlan) =>
+    plan.days.reduce((n, d) => n + d.exercises.reduce((m, e) => m + e.sets, 0), 0);
+  const creditIn = (plan: WeekPlan) =>
+    plan.balance.reduce((s, r) => s + r.planned + r.assist, 0);
+
+  assert.ok(setsIn(short) < setsIn(long), 'a 30 minute session should prescribe fewer sets');
+  assert.ok(
+    creditIn(short) < creditIn(long),
+    `trimmed sets must not still be counted: ${creditIn(short)} vs ${creditIn(long)}`,
+  );
+});

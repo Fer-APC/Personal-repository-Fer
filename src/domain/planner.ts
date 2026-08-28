@@ -488,12 +488,6 @@ export function generateWeekPlan(input: PlanInputs): WeekPlan {
           remaining[muscle] = Math.max(0, (remaining[muscle] ?? 0) - amount);
           dayDemand[muscle] = Math.max(0, (dayDemand[muscle] ?? 0) - amount * 1.6);
         }
-        for (const muscle of best.primary) {
-          plannedPrimaryByMuscle[muscle] = (plannedPrimaryByMuscle[muscle] ?? 0) + sets;
-        }
-        for (const muscle of best.secondary) {
-          plannedAssistByMuscle[muscle] = (plannedAssistByMuscle[muscle] ?? 0) + sets;
-        }
         filled++;
       }
     });
@@ -504,6 +498,19 @@ export function generateWeekPlan(input: PlanInputs): WeekPlan {
     });
 
     fitToTimeBudget(exercises, profile.sessionMinutes, notes);
+
+    // Count coverage only after trimming, so the balance reports the sets the
+    // session actually prescribes rather than the ones first chosen.
+    for (const planned of exercises) {
+      const definition = EXERCISE_BY_ID[planned.exerciseId];
+      if (!definition) continue;
+      for (const muscle of definition.primary) {
+        plannedPrimaryByMuscle[muscle] = (plannedPrimaryByMuscle[muscle] ?? 0) + planned.sets;
+      }
+      for (const muscle of definition.secondary) {
+        plannedAssistByMuscle[muscle] = (plannedAssistByMuscle[muscle] ?? 0) + planned.sets;
+      }
+    }
 
     const sameDayActivities = activities.filter((a) => a.day === slot.weekday);
     for (const activity of sameDayActivities) {
