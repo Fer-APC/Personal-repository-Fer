@@ -97,16 +97,28 @@ export function computeExternalLoad(activities: Activity[]): ExternalLoad {
   return load;
 }
 
+/**
+ * Compresses an unbounded load into 0-1 without ever clipping. A hard cap
+ * would make a couple of sessions a week look identical to a marathon block —
+ * both "maximum" — and the gym would then ask the same of the legs in both.
+ * This keeps rising, so more sport always means a little less lifting.
+ * `half` is the load at which the index reaches 0.5.
+ */
+function saturate(total: number, half: number): number {
+  return total <= 0 ? 0 : total / (total + half);
+}
+
 /** 0-1 summary of how beaten up the legs already are before any lifting. */
 export function legLoadIndex(load: ExternalLoad): number {
   const legs: Muscle[] = ['quads', 'hamstrings', 'calves', 'glutes'];
   const total = legs.reduce((s, m) => s + (load.perMuscle[m] ?? 0), 0);
-  return Math.min(1, total / 6);
+  // Roughly two hard sport sessions a week sits at the halfway mark.
+  return saturate(total, 6);
 }
 
 /** 0-1 summary of overhead shoulder exposure from sport. */
 export function overheadIndex(load: ExternalLoad): number {
-  return Math.min(1, load.overhead / 4);
+  return saturate(load.overhead, 4);
 }
 
 export function activityDescription(a: Activity): string {

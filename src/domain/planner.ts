@@ -218,9 +218,14 @@ function scoreExercise(
   }
   if (exercise.skill === 3 && profile.experience === 'intermediate') score *= 0.7;
 
-  // Joint budgets: exceeding what's left for the day makes it a bad pick.
-  if (exercise.kneeStress > state.kneeBudget) score *= 0.15;
-  if (exercise.shoulderStress > state.shoulderBudget) score *= 0.2;
+  // Joint budgets: penalise by how far past the day's remaining budget the
+  // exercise goes, not as a flat cliff. When a movement pattern has to be
+  // covered anyway, this is what picks a landmine press over a handstand
+  // push-up on shoulders the volleyball already used up.
+  const overBudget = (stress: number, budget: number) =>
+    stress <= budget ? 1 : Math.max(0.08, 1 - (stress - budget) * 0.6);
+  score *= overBudget(exercise.kneeStress, state.kneeBudget);
+  score *= overBudget(exercise.shoulderStress, state.shoulderBudget);
 
   // Superset legality: never stack the same muscle, prefer opposing regions.
   if (blockMates.length > 0) {
@@ -415,8 +420,12 @@ export function generateWeekPlan(input: PlanInputs): WeekPlan {
         const mustCover = remainingSlots <= state.unmetRequirements.size;
 
         let best: Exercise | null = null;
-        for (const relax of RELAXATION_LADDER) {
-          for (const requireCoverage of mustCover ? [true, false] : [false]) {
+        // Covering the day's movement patterns is the last thing to give way:
+        // exhaust every relaxation while still requiring it, and only then
+        // fall back to an exercise that covers nothing outstanding. The other
+        // order lets a full-body day end up with no pressing in it at all.
+        for (const requireCoverage of mustCover ? [true, false] : [false]) {
+          for (const relax of RELAXATION_LADDER) {
             let bestScore = -Infinity;
             for (const candidate of pool) {
               if (requireCoverage) {

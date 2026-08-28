@@ -1,17 +1,17 @@
-/** Prints the exercise library ranking — handy when tuning the ratings. */
-import { rateExercisesFor, standInsFor } from '../src/domain/library';
+import { generateWeekPlan } from '../src/domain/planner';
+import { computeExternalLoad, legLoadIndex, overheadIndex } from '../src/domain/activities';
 import { EXERCISE_BY_ID } from '../src/domain/exercises';
-import { MUSCLE_LABEL, ALL_MUSCLES } from '../src/domain/muscles';
-import { makeProfile } from '../tests/fixtures';
+import { makeProfile, RUNS_AND_VOLLEY } from '../tests/fixtures';
 
-const options = { profile: makeProfile(), logs: [] };
-for (const muscle of ALL_MUSCLES) {
-  const rated = rateExercisesFor(muscle, options);
-  if (rated.length === 0) continue;
-  console.log(`${MUSCLE_LABEL[muscle].padEnd(14)} ${rated.filter((r) => r.tier === 'staple').map((r) => r.exercise.name).join(', ')}`);
-}
-console.log('\nStand-ins when the station is busy:');
-for (const id of ['bb_bench', 'back_squat', 'lat_pulldown']) {
-  const ex = EXERCISE_BY_ID[id]!;
-  console.log(`  ${ex.name} → ${standInsFor(ex, options).map((r) => r.exercise.name).join(', ')}`);
+const load = computeExternalLoad(RUNS_AND_VOLLEY);
+console.log('legIdx', legLoadIndex(load).toFixed(2), 'overheadIdx', overheadIndex(load).toFixed(2));
+const plan = generateWeekPlan({ profile: makeProfile(), activities: RUNS_AND_VOLLEY, weekStart: '2026-08-24', logs: [], seed: 7, today: '2026-08-24' });
+console.log('split:', plan.splitName);
+for (const day of plan.days) {
+  console.log(`\n${day.title}`);
+  for (const e of day.exercises) {
+    const d = EXERCISE_BY_ID[e.exerciseId]!;
+    console.log(`   ${e.slot.padEnd(3)} ${d.name.padEnd(30)} [${d.pattern}] shoulderStress=${d.shoulderStress}`);
+  }
+  day.notes.forEach((n) => console.log('    !', n));
 }

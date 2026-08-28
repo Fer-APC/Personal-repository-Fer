@@ -12,7 +12,10 @@ No account, no server, no network. Everything lives in the browser and works off
 volley), picks a split, then fills each session exercise by exercise from what your
 body still needs that week.
 
-**Works around your sport.** Runs and volley aren't ignored, they're modelled. A week
+**Works around your sport.** Runs and volley aren't ignored, they're modelled. Sport load
+compresses onto a 0-1 scale that saturates smoothly rather than clipping, so a couple of
+sessions a week and a marathon block are never treated as the same "maximum" — more sport
+always means a little less asked of the legs in the gym. A week
 with intervals and a long run trims calf and quad volume but protects hamstrings and
 glutes, because that's what runners tear. A week of beach volley cuts overhead pressing
 and raises rear delt and rotator cuff work to balance the shoulder. Lifting the day

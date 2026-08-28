@@ -6,7 +6,7 @@ import { chooseGymDays } from '../src/domain/schedule';
 import { computeExternalLoad } from '../src/domain/activities';
 import { normaliseGoals } from '../src/domain/goals';
 import { makeProfile, RUNS_AND_VOLLEY } from './fixtures';
-import type { Muscle } from '../src/domain/types';
+import type { Activity, Muscle } from '../src/domain/types';
 
 const WEEK = '2026-08-24';
 
@@ -169,4 +169,102 @@ test('reports balance and flags nothing as silently missing', () => {
   if (missing.length) {
     assert.ok(result.warnings.some((w) => w.includes('Nothing directly targets')));
   }
+});
+
+test('more sport always means less asked of the legs in the gym', () => {
+  const a = (type: Activity['type'], day: number, durationMin: number, intensity: 1 | 2 | 3): Activity =>
+    ({ id: `${type}${day}${durationMin}`, type, day: day as Activity['day'], durationMin, intensity });
+
+  // Increasing sport load, from nothing to a marathon block with sport on top.
+  const weeks: Activity[][] = [
+    [],
+    [a('run_easy', 2, 30, 1)],
+    [a('volleyball', 3, 90, 2)],
+    [a('volleyball', 3, 90, 2), a('volleyball', 4, 90, 2), a('run_easy', 5, 45, 1)],
+    [a('run_intervals', 1, 60, 3), a('run_easy', 2, 50, 1), a('run_long', 5, 100, 2), a('volleyball', 3, 120, 3), a('volleyball', 6, 120, 3)],
+    [a('run_long', 6, 150, 3), a('run_intervals', 1, 75, 3), a('run_easy', 2, 60, 2), a('volleyball', 3, 120, 3), a('volleyball', 5, 120, 3), a('volleyball', 0, 120, 3)],
+  ];
+
+  const quadTargets = weeks.map(
+    (activities) => plan({}, activities).balance.find((b) => b.muscle === 'quads')!.target,
+  );
+  const calfTargets = weeks.map(
+    (activities) => plan({}, activities).balance.find((b) => b.muscle === 'calves')!.target,
+  );
+
+  for (let i = 1; i < quadTargets.length; i++) {
+    assert.ok(
+      quadTargets[i]! <= quadTargets[i - 1]!,
+      `quad target rose with more sport: ${quadTargets.join(' → ')}`,
+    );
+    assert.ok(calfTargets[i]! <= calfTargets[i - 1]!, `calf target rose: ${calfTargets.join(' → ')}`);
+  }
+
+  // The scale must not clip: a far heavier week has to ask for less than a
+  // moderate one, or the model stops telling them apart.
+  assert.ok(
+    quadTargets[5]! < quadTargets[3]!,
+    `a marathon block should spare the legs more than two volley sessions: ${quadTargets.join(' → ')}`,
+  );
+  assert.ok(calfTargets[5]! < calfTargets[3]!);
+});
+
+test('sport never removes leg training entirely', () => {
+  // Running and volley fatigue the legs but do not build strength, so the gym
+  // still has to load them.
+  const extreme = plan({}, [
+    { id: 'x1', type: 'run_long', day: 6, durationMin: 180, intensity: 3 },
+    { id: 'x2', type: 'run_intervals', day: 1, durationMin: 90, intensity: 3 },
+    { id: 'x3', type: 'volleyball', day: 3, durationMin: 180, intensity: 3 },
+    { id: 'x4', type: 'volleyball', day: 5, durationMin: 180, intensity: 3 },
+  ]);
+  for (const muscle of ['quads', 'hamstrings', 'glutes'] as const) {
+    const row = extreme.balance.find((b) => b.muscle === muscle)!;
+    assert.ok(row.target > 3, `${muscle} target collapsed to ${row.target}`);
+  }
+});
+
+test('hamstrings and glutes are protected relative to calves and quads', () => {
+  const none = plan({}, []);
+  const heavy = plan({}, [
+    { id: 'h1', type: 'run_long', day: 5, durationMin: 120, intensity: 3 },
+    { id: 'h2', type: 'run_intervals', day: 1, durationMin: 60, intensity: 3 },
+  ]);
+  const ratio = (m: Muscle) =>
+    heavy.balance.find((b) => b.muscle === m)!.target / none.balance.find((b) => b.muscle === m)!.target;
+
+  assert.ok(ratio('hamstrings') > ratio('quads'), 'hamstrings should be spared less than quads');
+  assert.ok(ratio('glutes') > ratio('calves'), 'glutes should be spared less than calves');
+});
+
+test('a full-body day always contains pressing, even when shoulders are loaded', () => {
+  // Heavy overhead sport shrinks the shoulder budget; the day must still press.
+  const result = plan({}, [
+    { id: 'v1', type: 'volleyball', day: 3, durationMin: 150, intensity: 3 },
+    { id: 'v2', type: 'volleyball', day: 5, durationMin: 150, intensity: 3 },
+  ]);
+  for (const day of result.days) {
+    const patterns = new Set(day.exercises.map((e) => EXERCISE_BY_ID[e.exerciseId]!.pattern));
+    assert.ok(
+      patterns.has('horizontal_push') || patterns.has('vertical_push'),
+      `${day.title} has no pressing at all`,
+    );
+  }
+});
+
+test('heavy overhead sport steers pressing towards shoulder-friendly options', () => {
+  const volley: Activity[] = [
+    { id: 'v1', type: 'volleyball', day: 3, durationMin: 150, intensity: 3 },
+    { id: 'v2', type: 'volleyball', day: 5, durationMin: 150, intensity: 3 },
+  ];
+  const averageShoulderStress = (activities: Activity[]) => {
+    const presses = plan({}, activities).days
+      .flatMap((d) => d.exercises.map((e) => EXERCISE_BY_ID[e.exerciseId]!))
+      .filter((e) => e.pattern === 'vertical_push' || e.pattern === 'horizontal_push');
+    return presses.reduce((sum, e) => sum + e.shoulderStress, 0) / Math.max(1, presses.length);
+  };
+  assert.ok(
+    averageShoulderStress(volley) < averageShoulderStress([]),
+    'a week full of spiking should not also prescribe the harshest presses',
+  );
 });
