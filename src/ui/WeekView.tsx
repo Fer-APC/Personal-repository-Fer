@@ -48,6 +48,16 @@ export function WeekView({ onOpenSession }: { onOpenSession: (logId: string) => 
   }
 
   // Sessions beyond your weekly target are offered, not required.
+  // The session you are most likely here for: the next one you have not done.
+  const focusIndex = (() => {
+    const next = plan.days.findIndex((day) => {
+      const log = store.logFor(weekStart, plan.days.indexOf(day));
+      const started = log?.exercises.some((e) => e.sets.some((set) => set.done));
+      return day.date >= today && !started;
+    });
+    return next >= 0 ? next : plan.days.length - 1;
+  })();
+
   const sessionsDone = store.state.logs.filter(
     (log) => log.weekStart === weekStart && (log.completed || log.exercises.some((e) => e.sets.some((s) => s.done))),
   ).length;
@@ -95,6 +105,21 @@ export function WeekView({ onOpenSession }: { onOpenSession: (logId: string) => 
         <div key={warning} className="banner warn">{warning}</div>
       ))}
 
+      {plan.days.map((day, dayIndex) => (
+        <DayCard
+          key={day.date}
+          day={day}
+          dayIndex={dayIndex}
+          weekStart={weekStart}
+          isToday={day.date === today}
+          startExpanded={dayIndex === focusIndex}
+          targetAlreadyMet={targetAlreadyMet}
+          onOpenSession={onOpenSession}
+        />
+      ))}
+
+      <ProgressCard weekStart={weekStart} today={today} onOpenSession={onOpenSession} />
+
       <Card>
         <details className="why-week">
           <summary>Why this week looks like this</summary>
@@ -116,20 +141,6 @@ export function WeekView({ onOpenSession }: { onOpenSession: (logId: string) => 
         )}
       </Card>
 
-      <ProgressCard weekStart={weekStart} today={today} onOpenSession={onOpenSession} />
-
-      {plan.days.map((day, dayIndex) => (
-        <DayCard
-          key={day.date}
-          day={day}
-          dayIndex={dayIndex}
-          weekStart={weekStart}
-          isToday={day.date === today}
-          targetAlreadyMet={targetAlreadyMet}
-          onOpenSession={onOpenSession}
-        />
-      ))}
-
       <div className="row" style={{ gap: 8, marginTop: 4 }}>
         <button type="button" className="wide" onClick={() => store.regeneratePlan(weekStart)}>
           Shuffle this week
@@ -142,17 +153,20 @@ export function WeekView({ onOpenSession }: { onOpenSession: (logId: string) => 
 }
 
 function DayCard({
-  day, dayIndex, weekStart, isToday, targetAlreadyMet, onOpenSession,
+  day, dayIndex, weekStart, isToday, startExpanded, targetAlreadyMet, onOpenSession,
 }: {
   day: PlannedDay;
   dayIndex: number;
   weekStart: string;
   isToday: boolean;
+  startExpanded: boolean;
   targetAlreadyMet: boolean;
   onOpenSession: (logId: string) => void;
 }) {
   const store = useStore();
   const [swapping, setSwapping] = useState<number | null>(null);
+  const [showReasons, setShowReasons] = useState(false);
+  const [expanded, setExpanded] = useState(startExpanded);
   const log = store.logFor(weekStart, dayIndex);
   const doneSets = log?.exercises.reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0) ?? 0;
   const newLifts = day.exercises.filter((e) => e.load.hint === 'first_time').length;
@@ -177,7 +191,25 @@ function DayCard({
         {day.emphasis.map((muscle) => <Chip key={muscle}>{MUSCLE_LABEL[muscle]}</Chip>)}
       </div>
 
-      {day.exercises.map((exercise, index) => {
+      {expanded ? (
+        <button
+          type="button"
+          className={`wide ${doneSets > 0 ? '' : 'primary'}`}
+          style={{ marginTop: 10, marginBottom: 4 }}
+          onClick={() => {
+            store.startSession(weekStart, dayIndex);
+            onOpenSession(sessionIdFor(weekStart, dayIndex));
+          }}
+        >
+          {log?.completed ? 'Session complete — review' : doneSets > 0 ? `Continue (${doneSets} sets logged)` : 'Start session'}
+        </button>
+      ) : (
+        <button type="button" className="wide" onClick={() => setExpanded(true)} style={{ marginTop: 8 }}>
+          Show {day.exercises.length} exercises
+        </button>
+      )}
+
+      {expanded && day.exercises.map((exercise, index) => {
         const previous = day.exercises[index - 1];
         const startsBlock = !previous || previous.blockIndex !== exercise.blockIndex;
         const blockSize = day.exercises.filter((e) => e.blockIndex === exercise.blockIndex).length;
@@ -206,14 +238,25 @@ function DayCard({
                   {exercise.load.kg != null ? ` · ${exercise.load.kg}kg` : ''}
                 </div>
                 {exercise.load.hint !== 'first_time' && <div className="why">{exercise.load.note}</div>}
-                <div className="why">{exercise.rationale}</div>
+                {showReasons && <div className="why">{exercise.rationale}</div>}
               </div>
             </div>
           </div>
         );
       })}
 
-      {(day.notes.length > 0 || newLifts > 0) && (
+      {expanded && (
+        <button
+          type="button"
+          className="ghost tiny-btn"
+          style={{ marginTop: 6 }}
+          onClick={() => setShowReasons((v) => !v)}
+        >
+          {showReasons ? 'Hide why these exercises' : 'Why these exercises?'}
+        </button>
+      )}
+
+      {expanded && (day.notes.length > 0 || newLifts > 0) && (
         <div className="small muted" style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
           {newLifts > 0 && (
             <div>
@@ -225,17 +268,6 @@ function DayCard({
         </div>
       )}
 
-      <button
-        type="button"
-        className={`wide ${doneSets > 0 ? '' : 'primary'}`}
-        style={{ marginTop: 12 }}
-        onClick={() => {
-          store.startSession(weekStart, dayIndex);
-          onOpenSession(sessionIdFor(weekStart, dayIndex));
-        }}
-      >
-        {log?.completed ? 'Session complete — review' : doneSets > 0 ? `Continue (${doneSets} sets logged)` : 'Start session'}
-      </button>
 
       {swapping != null && (
         <SwapModal
@@ -447,7 +479,7 @@ function ProgressCard({
         </button>
       </div>
       <p className="tiny muted" style={{ margin: '8px 0 0' }}>
-        Sessions rebuild themselves when you save one, so this is only needed if you edited an old session.
+        Saving a session already rebuilds the rest of the week.
       </p>
     </Card>
   );

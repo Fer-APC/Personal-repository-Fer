@@ -84,6 +84,21 @@ dead wifi.
 
 **Locally** — see below.
 
+## On a phone
+
+The app is built for a phone held in one hand mid-workout, so the layout is checked
+against a 360×660 CSS viewport (a Galaxy S24 with the browser chrome accounted for):
+
+- every control is at least 44×44px, including the set-done cell, which is a 56×52
+  target rather than a bare checkbox
+- number inputs are 16px, which stops mobile browsers zooming when a field is focused
+- the next session opens expanded at the top of the week with its action above the fold;
+  other days collapse to a heading, and per-exercise reasoning is behind a toggle
+
+`scripts/mobile-audit.mjs` measures all of this against a running preview — page height
+in screenfuls, sub-44px tap targets, text under 12.5px, horizontal overflow — and is
+worth re-running after any layout change.
+
 ## Running it
 
 ```bash

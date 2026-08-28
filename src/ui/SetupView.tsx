@@ -7,7 +7,7 @@ import { DEFAULT_STRUCTURE } from '../domain/planner';
 import { WEEKDAY_LABEL } from '../domain/date';
 import { ActivityEditor } from './ActivityEditor';
 import { StructureEditor } from './StructureEditor';
-import { Card, Chip, Field, FieldGroup, Modal, Segmented, Toggles } from './components';
+import { Chip, CollapsibleCard, Field, FieldGroup, Modal, Segmented, Toggles } from './components';
 import type { Equipment, Goal, Muscle, Weekday } from '../domain/types';
 
 const EQUIPMENT: { value: Equipment; label: string }[] = [
@@ -52,8 +52,7 @@ export function SetupView() {
         </div>
       </div>
 
-      <Card>
-        <h2>Goals</h2>
+      <CollapsibleCard title="Goals" summary="what the plan optimises for" defaultOpen>
         <p className="small muted" style={{ marginTop: 0 }}>
           Slide as many as you like — they are balanced against each other, so a bit of everything is a valid
           answer. These drive rep ranges, rest, exercise choice and how much volume each muscle gets.
@@ -76,10 +75,9 @@ export function SetupView() {
             <div className="tiny muted">{GOAL_BLURB[goal]}</div>
           </div>
         ))}
-      </Card>
+      </CollapsibleCard>
 
-      <Card>
-        <h2>Availability</h2>
+      <CollapsibleCard title="Availability" summary="days, session length, experience">
         <FieldGroup label="Gym days per week">
           <Segmented
             options={[{ value: 2 as const, label: '2 days' }, { value: 3 as const, label: '3 days' }]}
@@ -117,12 +115,11 @@ export function SetupView() {
             onChange={(experience) => store.updateProfile({ experience })}
           />
         </FieldGroup>
-      </Card>
+      </CollapsibleCard>
 
       <ActivityEditor />
 
-      <Card>
-        <h2>Session shape</h2>
+      <CollapsibleCard title="Session shape" summary="exercises and supersets per day">
         <p className="small muted" style={{ marginTop: 0 }}>
           How many exercises each day, and which of them run as supersets. Block A is always the freshest slot,
           so the planner puts the heaviest work there.
@@ -150,10 +147,9 @@ export function SetupView() {
         >
           Use day 1's shape for every day
         </button>
-      </Card>
+      </CollapsibleCard>
 
-      <Card>
-        <h2>Equipment</h2>
+      <CollapsibleCard title="Equipment" summary="what your gym has">
         <Toggles
           options={EQUIPMENT}
           selected={profile.equipment}
@@ -165,10 +161,9 @@ export function SetupView() {
             })
           }
         />
-      </Card>
+      </CollapsibleCard>
 
-      <Card>
-        <h2>Work around</h2>
+      <CollapsibleCard title="Work around" summary="injuries and banned exercises">
         <FieldGroup label="Muscles to leave alone" hint="niggles and injuries">
           <Toggles
             options={ALL_MUSCLES.map((muscle) => ({ value: muscle, label: MUSCLE_LABEL[muscle] }))}
@@ -203,10 +198,9 @@ export function SetupView() {
             ))}
           </div>
         )}
-      </Card>
+      </CollapsibleCard>
 
-      <Card>
-        <h2>Recovery</h2>
+      <CollapsibleCard title="Recovery" summary="deload cadence and bodyweight">
         <FieldGroup label="Deload every" hint="a lighter week on a fixed cadence">
           <Segmented
             options={[
@@ -228,10 +222,9 @@ export function SetupView() {
             onChange={(e) => store.updateProfile({ bodyweightKg: Number(e.target.value) })}
           />
         </Field>
-      </Card>
+      </CollapsibleCard>
 
-      <Card>
-        <h2>Data</h2>
+      <CollapsibleCard title="Data" summary="export and reset">
         <p className="small muted" style={{ marginTop: 0 }}>
           Everything lives in this browser. Export before clearing site data or switching device.
         </p>
@@ -249,7 +242,7 @@ export function SetupView() {
             Reset everything
           </button>
         </div>
-      </Card>
+      </CollapsibleCard>
 
       {exporting && <ExportModal json={JSON.stringify(store.state, null, 2)} onClose={() => setExporting(false)} />}
     </>

@@ -4,6 +4,34 @@ export function Card({ children, className = '' }: { children: ReactNode; classN
   return <section className={`card ${className}`}>{children}</section>;
 }
 
+/**
+ * A card that starts collapsed. Long settings screens are far easier to scan
+ * as a list of headings than as one continuous column of controls.
+ */
+export function CollapsibleCard({
+  title, summary, defaultOpen = false, children,
+}: {
+  title: string;
+  summary?: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <section className="card">
+      <details open={defaultOpen}>
+        <summary className="card-summary">
+          <span>
+            <strong>{title}</strong>
+            {summary ? <span className="small muted"> · {summary}</span> : null}
+          </span>
+          <span className="chevron" aria-hidden="true">›</span>
+        </summary>
+        <div style={{ marginTop: 14 }}>{children}</div>
+      </details>
+    </section>
+  );
+}
+
 export function Chip({ children, tone = 'default' }: { children: ReactNode; tone?: 'default' | 'accent' | 'good' | 'warn' | 'danger' }) {
   return <span className={`chip ${tone === 'default' ? '' : tone}`}>{children}</span>;
 }

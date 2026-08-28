@@ -198,7 +198,7 @@ export function SessionView({ logId, onBack }: { logId: string; onBack: () => vo
                   onChange={(value) => store.updateSet(log.id, exerciseIndex, setIndex, { rpe: value })}
                   placeholder={planned ? String(planned.rpe) : ''}
                 />
-                <div className="check">
+                <label className="check">
                   <input
                     type="checkbox"
                     checked={set.done}
@@ -211,7 +211,7 @@ export function SessionView({ logId, onBack }: { logId: string; onBack: () => vo
                       })
                     }
                   />
-                </div>
+                </label>
               </div>
             ))}
 
