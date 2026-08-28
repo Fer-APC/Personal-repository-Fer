@@ -2,31 +2,44 @@ import { useMemo, useState } from 'react';
 import { useStore } from '../app/state';
 import { MUSCLE_LABEL, MUSCLE_REGION, type Region } from '../domain/muscles';
 import { EXERCISE_BY_ID } from '../domain/exercises';
-import { completedSetsByMuscle } from '../domain/progression';
+import { computeWeekProgress, type MuscleProgress } from '../domain/progress';
 import { addDays, fromISODate, weekStartISO } from '../domain/date';
 import { Card, Chip } from './components';
-import type { BalanceRow } from '../domain/types';
+import type { Muscle } from '../domain/types';
 
 const REGION_LABEL: Record<Region, string> = {
   push: 'Push', pull: 'Pull', legs: 'Legs', core: 'Core & trunk',
 };
 
-const STATUS_TONE = { under: 'warn', on: 'good', over: 'accent', missing: 'danger' } as const;
+type Status = 'done' | 'on track' | 'short' | 'not reached';
+
+function statusOf(row: MuscleProgress): Status {
+  if (row.target <= 0) return 'done';
+  if (row.logged >= row.target * 0.85) return 'done';
+  if (row.logged + row.scheduled >= row.target * 0.85) return 'on track';
+  return row.structural >= row.target * 0.5 ? 'not reached' : 'short';
+}
+
+const STATUS_TONE: Record<Status, 'good' | 'accent' | 'warn' | 'danger'> = {
+  done: 'good', 'on track': 'accent', short: 'warn', 'not reached': 'danger',
+};
 
 export function BalanceView() {
   const store = useStore();
   const [weekStart] = useState(() => weekStartISO(new Date()));
+  const today = new Date().toISOString().slice(0, 10);
   const plan = store.planFor(weekStart);
 
-  const weekLogs = useMemo(
-    () => store.state.logs.filter((l) => l.weekStart === weekStart),
-    [store.state.logs, weekStart],
+  const progress = useMemo(
+    () => (plan ? computeWeekProgress(plan, store.state.logs, today, store.state.profile.daysPerWeek) : null),
+    [plan, store.state.logs, today, store.state.profile.daysPerWeek],
   );
-  const completed = useMemo(() => completedSetsByMuscle(weekLogs), [weekLogs]);
-  const loggedSets = useMemo(
-    () => weekLogs.reduce((n, l) => n + l.exercises.reduce((m, e) => m + e.sets.filter((s) => s.done).length, 0), 0),
-    [weekLogs],
-  );
+
+  const sportCredit = useMemo(() => {
+    const out: Partial<Record<Muscle, number>> = {};
+    for (const row of plan?.balance ?? []) out[row.muscle] = row.externalCredit;
+    return out;
+  }, [plan]);
 
   const history = useMemo(() => {
     const weeks: { weekStart: string; sessions: number; sets: number; tonnage: number }[] = [];
@@ -43,11 +56,13 @@ export function BalanceView() {
     return weeks;
   }, [store.state.logs, weekStart]);
 
-  if (!plan) return <div className="empty">No plan yet for this week.</div>;
+  if (!plan || !progress) return <div className="empty">No plan yet for this week.</div>;
 
   const byRegion = (['push', 'pull', 'legs', 'core'] as Region[]).map((region) => ({
     region,
-    rows: plan.balance.filter((row) => MUSCLE_REGION[row.muscle] === region && (row.target > 0 || row.planned > 0)),
+    rows: progress.muscles.filter(
+      (row) => MUSCLE_REGION[row.muscle] === region && (row.target > 0 || row.logged > 0 || row.scheduled > 0),
+    ),
   }));
 
   return (
@@ -55,12 +70,21 @@ export function BalanceView() {
       <div className="topbar">
         <div>
           <h1>Balance</h1>
-          <div className="sub">Weekly sets planned against what your goals ask for</div>
+          <div className="sub">Which muscles this week actually covered</div>
         </div>
       </div>
 
       <Card>
-        <div className="row between">
+        <p className="small" style={{ marginTop: 0 }}>
+          Training drifts without you noticing — you press more than you pull, or the legs quietly disappear
+          because you already run. This is the check: every muscle, what you have trained so far, what your
+          remaining sessions will add, and the target your goals ask for.
+        </p>
+        <div className="row between" style={{ marginTop: 12 }}>
+          <div>
+            <div className="small muted">Sets logged</div>
+            <strong>{progress.setsLogged}</strong>
+          </div>
           <div>
             <div className="small muted">Push : pull</div>
             <strong>{plan.ratios.pushPull.toFixed(2)}</strong>
@@ -69,21 +93,20 @@ export function BalanceView() {
             <div className="small muted">Upper : lower</div>
             <strong>{plan.ratios.upperLower.toFixed(2)}</strong>
           </div>
-          <div>
-            <div className="small muted">Sets logged</div>
-            <strong>{loggedSets}</strong>
-          </div>
         </div>
         <p className="tiny muted" style={{ marginBottom: 0, marginTop: 10 }}>
-          Solid bar is direct work, faded bar is assistance at half credit, and the tick marks the target your
-          goals ask for. Targets are already reduced by whatever your runs and volley cover.
+          Solid bar is what you have done, faded is what your remaining sessions add, and the tick is the
+          target. Targets are already reduced by whatever your runs and volley cover.
         </p>
       </Card>
 
       {byRegion.map(({ region, rows }) => (
         <Card key={region}>
           <h3>{REGION_LABEL[region]}</h3>
-          {rows.map((row) => <BalanceBar key={row.muscle} row={row} logged={completed[row.muscle] ?? 0} />)}
+          {rows.length === 0 && <p className="small muted" style={{ margin: 0 }}>Nothing planned or logged.</p>}
+          {rows.map((row) => (
+            <MuscleBar key={row.muscle} row={row} credit={sportCredit[row.muscle] ?? 0} />
+          ))}
         </Card>
       ))}
 
@@ -111,31 +134,30 @@ export function BalanceView() {
   );
 }
 
-function BalanceBar({ row, logged }: { row: BalanceRow; logged: number }) {
-  const effective = row.planned + row.assist * 0.5;
-  // Leave headroom so the target tick stays inside the track when volume is low.
-  const scale = Math.max(row.target, effective, 1) * 1.08;
+function MuscleBar({ row, credit }: { row: MuscleProgress; credit: number }) {
+  const status = statusOf(row);
+  const scale = Math.max(row.target, row.logged + row.scheduled, 1) * 1.08;
   const pct = (value: number) => `${Math.min(100, (value / scale) * 100)}%`;
+
   return (
     <div className="balance-row">
       <span className="label">{MUSCLE_LABEL[row.muscle]}</span>
       <div>
         <div className="bar">
-          <div className="fill" style={{ width: pct(row.planned) }} />
-          <div className="fill assist" style={{ width: pct(row.assist * 0.5) }} />
+          <div className="fill" style={{ width: pct(row.logged) }} />
+          <div className="fill assist" style={{ width: pct(row.scheduled) }} />
           {row.target > 0 && (
             <div className="target-tick" style={{ left: pct(row.target) }} title={`target ${row.target} sets`} />
           )}
         </div>
         <div className="tiny muted" style={{ marginTop: 3 }}>
-          {row.planned} direct
-          {row.assist > 0 ? ` + ${row.assist} assist` : ''}
-          {' · target '}{row.target}
-          {row.externalCredit > 0 ? ` · sport adds ~${row.externalCredit}` : ''}
-          {logged > 0 ? ` · ${logged} logged` : ''}
+          {row.logged} done
+          {row.scheduled > 0 ? ` + ${row.scheduled} to come` : ''}
+          {` · target ${row.target}`}
+          {credit > 0 ? ` · sport adds ~${credit}` : ''}
         </div>
       </div>
-      <Chip tone={STATUS_TONE[row.status]}>{row.status}</Chip>
+      <Chip tone={STATUS_TONE[status]}>{status}</Chip>
     </div>
   );
 }

@@ -42,9 +42,11 @@ Two different gaps are reported separately: work you missed by skipping sessions
 muscles your session shape cannot reach at all — the second closes only by changing the
 shape, never by training harder.
 
-**Keeps the week balanced.** The Balance tab shows every muscle's planned sets against
-its target, separating direct work from assistance, and flags anything under-served,
-over-served, or missing entirely.
+**Keeps the week balanced.** Training drifts without you noticing — you press more than
+you pull, or the legs quietly disappear because you already run. The Balance tab is the
+check: every muscle, what you have actually trained so far, what the sessions you have
+left will add, and the target. A week whose gym days have all passed still reports what
+was done rather than blanking.
 
 **Adapts within the week, not just between weeks.** Save a session and the days you
 haven't trained yet are rebuilt around what you actually did. Skip the lat work and it

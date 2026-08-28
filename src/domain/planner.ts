@@ -308,13 +308,21 @@ export function generateWeekPlan(input: PlanInputs): WeekPlan {
     ? input.basePlan.days.map((d) => d.weekday)
     : chooseGymDays(profile, load, earliestWeekday);
 
+  const sessionsTrained = logs.filter(
+    (log) => log.weekStart === weekStart && log.exercises.some((e) => e.sets.some((set) => set.done)),
+  ).length;
+  // Days still ahead plus sessions already done: once the last gym day has
+  // passed, the week is still worth measuring against what it held, and a
+  // fraction of zero would wipe every target and blank the balance report.
+  const trainableDays = Math.max(1, gymDays.length + sessionsTrained);
+
   const volume = computeVolumeTargets({
     profile,
     load,
     deficits,
     soreness,
     deload: deloadDecision.deload,
-    weekFraction: input.basePlan ? 1 : Math.min(1, gymDays.length / profile.daysPerWeek),
+    weekFraction: input.basePlan ? 1 : Math.min(1, trainableDays / profile.daysPerWeek),
   });
   const slots = describeDaySlots(gymDays, load);
 
@@ -336,9 +344,11 @@ export function generateWeekPlan(input: PlanInputs): WeekPlan {
 
   if (gymDays.length < profile.daysPerWeek) {
     warnings.push(
-      earliestWeekday > 0
-        ? `Only ${gymDays.length} of your ${profile.daysPerWeek} gym days are left this week, so this week's targets are scaled down to match.`
-        : `You asked for ${profile.daysPerWeek} gym days but only ${gymDays.length} weekday${gymDays.length === 1 ? ' is' : 's are'} marked available.`,
+      gymDays.length === 0
+        ? `No gym days left this week — the days you marked available have passed. Everything below is what you already did.`
+        : earliestWeekday > 0
+          ? `Only ${gymDays.length} of your ${profile.daysPerWeek} gym days are left this week, so this week's targets are scaled down to match.`
+          : `You asked for ${profile.daysPerWeek} gym days but only ${gymDays.length} weekday${gymDays.length === 1 ? ' is' : 's are'} marked available.`,
     );
   }
 
@@ -550,7 +560,7 @@ export function generateWeekPlan(input: PlanInputs): WeekPlan {
   const delivered = Object.entries(plannedPrimaryByMuscle).reduce((sum, [, v]) => sum + (v ?? 0), 0)
     + Object.entries(plannedAssistByMuscle).reduce((sum, [, v]) => sum + (v ?? 0), 0) * 0.5;
   const ideal = Object.values(volume.target).reduce((sum, value) => sum + value, 0);
-  const capacityRatio = ideal > 0 ? Math.min(1, delivered / ideal) : 1;
+  const capacityRatio = ideal > 0 && delivered > 0 ? Math.min(1, delivered / ideal) : 1;
 
   const scaledTargets = {} as Record<Muscle, number>;
   for (const muscle of ALL_MUSCLES) {

@@ -471,3 +471,45 @@ test('targets never ask for more than the week can deliver', () => {
   );
   assert.ok(!plan.warnings.some((w) => w.includes('fits about')), 'the permanent shortfall warning is gone');
 });
+
+test('a week with no gym days left still reports what was trained', () => {
+  // Gym on weekdays only; it is now Saturday. Nothing is left to plan, but the
+  // week still has to be measurable — a target of zero blanks the report and
+  // erases the work that was done.
+  const profile = makeProfile({
+    daysPerWeek: 2,
+    availability: { 0: true, 1: true, 2: true, 3: true, 4: true, 5: false, 6: false },
+  });
+  const logs: SessionLog[] = [WEEK, '2026-08-26'].map((date, i) => ({
+    id: `${WEEK}#done-${i}`,
+    weekStart: WEEK,
+    date,
+    dayIndex: AD_HOC_DAY,
+    title: 'Session',
+    completed: true,
+    sessionRpe: 8,
+    durationMin: 60,
+    soreness: {},
+    exercises: [
+      { exerciseId: 'bb_bench', sets: Array.from({ length: 4 }, () => doneSet()) },
+      { exerciseId: 'bb_row', sets: Array.from({ length: 4 }, () => doneSet()) },
+    ],
+  }));
+
+  const plan = generateWeekPlan({
+    profile, activities: [], weekStart: WEEK, logs, seed: 5, today: '2026-08-29',
+  });
+
+  assert.equal(plan.days.length, 0, 'no gym days should remain');
+  const total = Object.values(plan.targets).reduce((sum, value) => sum + (value ?? 0), 0);
+  assert.ok(total > 0, 'the week must still have targets to measure against');
+
+  const progress = computeWeekProgress(plan, logs, '2026-08-29', profile.daysPerWeek);
+  const measurable = progress.muscles.filter((m) => m.target > 0 || m.logged > 0);
+  assert.ok(measurable.length >= 10, `expected the report to have rows, got ${measurable.length}`);
+  assert.ok(progress.muscles.find((m) => m.muscle === 'chest')!.logged >= 4, 'logged work must show');
+  assert.ok(
+    plan.warnings.some((w) => w.includes('No gym days left')),
+    'the user should be told why nothing is scheduled',
+  );
+});
