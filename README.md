@@ -53,6 +53,17 @@ passed lock in place, and whatever they didn't cover rolls forward.
 improvised one, work you added on top — by searching the exercise database. It counts
 toward the week the same as a planned session.
 
+**Has a browsable exercise library.** Every exercise grouped by the muscle it targets,
+ranked for your goal mix, with the top two in each group marked as staples and every
+rating explained: how well it fits your goals, how much muscle it trains per set, and how
+much room you have left to progress on it. Externally loaded lifts never run out;
+bodyweight work runs out when its ladder does.
+
+**Answers "someone is on that machine".** Every exercise — in the library, on the plan,
+and inside a session you are logging — offers stand-ins that train the same muscles,
+keep the same movement pattern where possible, and need none of the same equipment. If
+the pulldown station is taken it offers pull-ups, not a row.
+
 **Takes dictation.** Tap the microphone and talk: "on Monday I did squats five sets of
 five at a hundred kilos, bench press three by eight at sixty, my hamstrings are sore,
 more calisthenics". It logs the sets against Monday, records the soreness, and shifts the
@@ -128,6 +139,13 @@ The pipeline lives in `src/domain/` and runs in this order:
 | 5 | `progression.ts` | Turns your logs into load suggestions, deficits, ladder steps and deload calls |
 | 6 | `progress.ts` | Scores the week in flight: what's logged, what's still scheduled, what will fall short |
 | 7 | `voice.ts` / `apply.ts` | Turns spoken sentences into typed commands, then applies them to the state |
+| 8 | `library.ts` | Rates and groups the exercise database, and finds stand-ins for busy equipment |
+
+Ratings blend goal fit (which leads, so the best side-delt movement is a lateral raise
+rather than whatever lists the most muscles), progression headroom, muscle worked per
+set, and what the current week is short of. Stand-ins additionally weigh how much of the
+original they replace and whether they keep the same movement pattern, and show one rung
+per progression ladder so the list is six options rather than one ladder four times.
 
 Dictation is parsed in the browser, with no model and no network call: `voice.ts` maps
 speech to a `Command[]`, and `apply.ts` is a pure function from `(state, commands)` to a

@@ -4,10 +4,11 @@ import { WeekView } from './ui/WeekView';
 import { SessionView } from './ui/SessionView';
 import { BalanceView } from './ui/BalanceView';
 import { SetupView } from './ui/SetupView';
+import { LibraryView } from './ui/LibraryView';
 import { Onboarding } from './ui/Onboarding';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 
-type Tab = 'week' | 'balance' | 'setup';
+type Tab = 'week' | 'balance' | 'library' | 'setup';
 
 function Shell() {
   const store = useStore();
@@ -31,12 +32,14 @@ function Shell() {
       <div className="app">
         {tab === 'week' && <WeekView onOpenSession={setOpenLogId} />}
         {tab === 'balance' && <BalanceView />}
+        {tab === 'library' && <LibraryView />}
         {tab === 'setup' && <SetupView />}
       </div>
 
       <nav className="tabbar">
         <TabButton current={tab} value="week" glyph="🗓" label="Week" onSelect={setTab} />
         <TabButton current={tab} value="balance" glyph="📊" label="Balance" onSelect={setTab} />
+        <TabButton current={tab} value="library" glyph="📚" label="Exercises" onSelect={setTab} />
         <TabButton current={tab} value="setup" glyph="⚙️" label="Setup" onSelect={setTab} />
       </nav>
     </>

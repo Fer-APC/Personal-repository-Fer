@@ -27,6 +27,8 @@ interface Store {
   setLogDate: (id: string, date: string) => void;
   setLogTitle: (id: string, title: string) => void;
   addExerciseToLog: (id: string, exerciseId: string) => void;
+  /** Replaces an exercise in a session, keeping its unlogged sets. */
+  swapExerciseInLog: (id: string, exerciseIndex: number, newExerciseId: string) => void;
   removeExerciseFromLog: (id: string, exerciseIndex: number) => void;
   /** Rebuilds the days not yet trained from what has actually been logged. */
   adaptRemaining: (weekStart: string) => void;
@@ -190,6 +192,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                     ...log.exercises,
                     { exerciseId, sets: Array.from({ length: 3 }, () => emptySet()) },
                   ],
+                }
+              : log,
+          ),
+        })),
+
+      swapExerciseInLog: (id, exerciseIndex, newExerciseId) =>
+        setState((s) => ({
+          ...s,
+          logs: s.logs.map((log) =>
+            log.id === id
+              ? {
+                  ...log,
+                  exercises: log.exercises.map((entry, i) =>
+                    i === exerciseIndex ? { ...entry, exerciseId: newExerciseId } : entry,
+                  ),
                 }
               : log,
           ),

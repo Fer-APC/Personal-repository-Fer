@@ -5,6 +5,7 @@ import { MUSCLE_LABEL } from '../domain/muscles';
 import { lastPerformance } from '../domain/progression';
 import { formatDayLabel, toISODate } from '../domain/date';
 import { ExercisePicker } from './ExercisePicker';
+import { SwapDuringSession } from './SwapDuringSession';
 import { VoiceCommand } from './VoiceCommand';
 import { Card, Chip, Field, NumberInput } from './components';
 import { AD_HOC_DAY, type Muscle, type PlannedExercise } from '../domain/types';
@@ -17,6 +18,7 @@ export function SessionView({ logId, onBack }: { logId: string; onBack: () => vo
   const [showSoreness, setShowSoreness] = useState(false);
   const [picking, setPicking] = useState(false);
   const [dictating, setDictating] = useState(false);
+  const [swapping, setSwapping] = useState<number | null>(null);
 
   if (!log) {
     return (
@@ -143,6 +145,14 @@ export function SessionView({ logId, onBack }: { logId: string; onBack: () => vo
               <strong>{definition?.name ?? entry.exerciseId}</strong>
               <div className="row" style={{ gap: 6 }}>
                 {planned && <Chip tone="accent">{planned.slot}</Chip>}
+                <button
+                  type="button"
+                  className="tiny-btn"
+                  aria-label={`Swap ${definition?.name ?? 'exercise'}`}
+                  onClick={() => setSwapping(exerciseIndex)}
+                >
+                  swap
+                </button>
                 <button
                   type="button"
                   className="tiny-btn danger"
@@ -273,6 +283,10 @@ export function SessionView({ logId, onBack }: { logId: string; onBack: () => vo
       </Card>
 
       {dictating && <VoiceCommand targetLogId={log.id} onClose={() => setDictating(false)} />}
+
+      {swapping != null && (
+        <SwapDuringSession logId={log.id} exerciseIndex={swapping} onClose={() => setSwapping(null)} />
+      )}
 
       {picking && (
         <ExercisePicker
