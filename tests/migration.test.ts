@@ -9,7 +9,11 @@ import type { AppState, WeekPlan } from '../src/domain/types';
 const WEEK = '2026-08-24';
 
 /** A plan loosened so release-specific fields can be stripped off it. */
-type LoosePlan = Omit<WeekPlan, 'targets' | 'balance'> & { targets?: unknown; balance?: unknown };
+type LoosePlan = Omit<WeekPlan, 'targets' | 'balance' | 'capacity'> & {
+  targets?: unknown;
+  balance?: unknown;
+  capacity?: unknown;
+};
 
 function currentPlan(): WeekPlan {
   return generateWeekPlan({
@@ -98,4 +102,16 @@ test('empty and partial states fall back to defaults', () => {
   assert.equal(migrate({}).onboarded, false);
   assert.deepEqual(migrate({}).plans, {});
   assert.equal(migrate({ onboarded: true }).profile.daysPerWeek, 3);
+});
+
+test('a plan saved before capacity tracking still loads and renders', () => {
+  const plan = currentPlan() as LoosePlan;
+  delete plan.capacity;
+  const migrated = migrate({ version: 2, plans: { [WEEK]: plan as WeekPlan } });
+
+  const restored = migrated.plans[WEEK]!;
+  assert.ok(restored.capacity, 'capacity must be reconstructed');
+  assert.ok(restored.capacity.ratio > 0 && restored.capacity.ratio <= 1);
+  assert.equal(migrated.version, STATE_VERSION);
+  assert.doesNotThrow(() => computeWeekProgress(restored, [], WEEK, 3));
 });

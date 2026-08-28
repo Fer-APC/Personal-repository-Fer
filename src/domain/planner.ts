@@ -531,7 +531,24 @@ export function generateWeekPlan(input: PlanInputs): WeekPlan {
     } satisfies PlannedDay;
   });
 
-  const balance = buildBalance(volume.target, plannedPrimaryByMuscle, plannedAssistByMuscle, volume.credit);
+  // The per-muscle targets so far describe an unconstrained ideal — the volume
+  // your goals would use with unlimited days. A deliberately compact week can
+  // never reach it, so judging every week against it would report a permanent
+  // shortfall that says nothing about your training. Scale the whole vector to
+  // what these sessions actually deliver, keeping its proportions: 100% then
+  // means "a full week as you have set it up", while a muscle the split could
+  // not reach still shows as under-served relative to the others.
+  const delivered = Object.entries(plannedPrimaryByMuscle).reduce((sum, [, v]) => sum + (v ?? 0), 0)
+    + Object.entries(plannedAssistByMuscle).reduce((sum, [, v]) => sum + (v ?? 0), 0) * 0.5;
+  const ideal = Object.values(volume.target).reduce((sum, value) => sum + value, 0);
+  const capacityRatio = ideal > 0 ? Math.min(1, delivered / ideal) : 1;
+
+  const scaledTargets = {} as Record<Muscle, number>;
+  for (const muscle of ALL_MUSCLES) {
+    scaledTargets[muscle] = Math.round((volume.target[muscle] ?? 0) * capacityRatio * 2) / 2;
+  }
+
+  const balance = buildBalance(scaledTargets, plannedPrimaryByMuscle, plannedAssistByMuscle, volume.credit);
   const ratios = computeRatios(plannedPrimaryByMuscle);
 
   // Warnings the user can act on.
@@ -542,19 +559,13 @@ export function generateWeekPlan(input: PlanInputs): WeekPlan {
   if (ratios.pushPull > 1.35) warnings.push('Push volume is running well ahead of pull volume this week.');
   if (ratios.pushPull < 0.7) warnings.push('Pull volume is running well ahead of push volume this week.');
 
-  const totalTarget = Object.values(volume.target).reduce((a, b) => a + b, 0);
-  const totalPlanned = balance.reduce((sum, row) => sum + row.planned + row.assist * 0.5, 0);
-  if (totalPlanned < totalTarget * 0.75) {
-    warnings.push(
-      `Your structure fits about ${Math.round((totalPlanned / totalTarget) * 100)}% of the weekly volume your goals suggest. More exercises per day, or a third day, would close the gap.`,
-    );
-  }
 
   reasoning.push(
     `Gym on ${gymDays.map((d) => WEEKDAY_LABEL[d]).join(', ')} — chosen to sit as far as possible from your ${describeActivities(activities)}.`,
   );
   reasoning.push(`Split: ${split.name}. ${splitReason(split.name, load)}`);
   reasoning.push(...volume.notes);
+  reasoning.push(...capacityNotes(days, capacityRatio, delivered, ideal, profile));
   if (deloadDecision.reason) reasoning.push(deloadDecision.reason);
 
   return {
@@ -567,8 +578,46 @@ export function generateWeekPlan(input: PlanInputs): WeekPlan {
     ratios,
     warnings,
     reasoning,
-    targets: volume.target,
+    targets: scaledTargets,
+    capacity: { delivered: Math.round(delivered), ideal: Math.round(ideal), ratio: capacityRatio },
   };
+}
+
+/**
+ * Explains the gap between the week you chose and an unconstrained ideal, in
+ * terms of the two things you can actually change: days, and exercises per day.
+ */
+function capacityNotes(
+  days: PlannedDay[],
+  ratio: number,
+  delivered: number,
+  ideal: number,
+  profile: Profile,
+): string[] {
+  if (days.length === 0 || ratio >= 0.95) return [];
+
+  const exercises = days.reduce((n, day) => n + day.exercises.length, 0);
+  const perDay = Math.round(exercises / days.length);
+  const creditPerExercise = exercises > 0 ? delivered / exercises : 0;
+  const asPercent = (muscleSets: number) => Math.round((muscleSets / ideal) * 100);
+
+  const notes = [
+    `Targets are scaled to what ${days.length} ${days.length === 1 ? 'session' : 'sessions'} of ${perDay} exercises can hold — about ${Math.round(ratio * 100)}% of the volume your goals would use with unlimited days. Hitting 100% here means a full week as you have set it up, not a compromise.`,
+  ];
+
+  const options: string[] = [];
+  if (profile.daysPerWeek < 3) {
+    options.push(`a third day would add roughly ${asPercent(creditPerExercise * perDay)}%`);
+  }
+  options.push(`two more exercises per session about ${asPercent(creditPerExercise * 2 * days.length)}%`);
+
+  const trimmed = days.some((day) => day.notes.some((note) => note.startsWith('Trimmed')));
+  notes.push(
+    trimmed
+      ? `Your ${profile.sessionMinutes} minute limit is already trimming sets, so more volume needs longer sessions before more exercises: ${options.join(', and ')}.`
+      : `If you want more: ${options.join(', and ')}.`,
+  );
+  return notes;
 }
 
 function describeActivities(activities: Activity[]): string {

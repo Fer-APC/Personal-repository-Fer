@@ -413,3 +413,61 @@ test('the balance reports the sets the session actually prescribes', () => {
     `trimmed sets must not still be counted: ${creditIn(short)} vs ${creditIn(long)}`,
   );
 });
+
+test('completing the whole plan reads as a full week', () => {
+  // The point of scaling targets to the configured week: doing everything the
+  // plan asks must read as done, not as a permanent shortfall.
+  const state = baseState();
+  const plan = state.plans[WEEK]!;
+  for (const [index, day] of plan.days.entries()) {
+    state.logs.push({
+      id: `${WEEK}#${index}`,
+      weekStart: WEEK,
+      date: day.date,
+      dayIndex: index,
+      title: day.title,
+      completed: true,
+      sessionRpe: 8,
+      durationMin: 60,
+      soreness: {},
+      exercises: day.exercises.map((e) => ({
+        exerciseId: e.exerciseId,
+        sets: Array.from({ length: e.sets }, () => doneSet(e.repRange[1])),
+      })),
+    });
+  }
+
+  const progress = computeWeekProgress(plan, state.logs, '2026-08-31', state.profile.daysPerWeek);
+  assert.ok(progress.covered >= 0.95, `expected a full week, got ${Math.round(progress.covered * 100)}%`);
+  assert.equal(progress.shortfalls.length, 0, 'nothing is missed when every session was done');
+});
+
+test('targets never ask for more than the week can deliver', () => {
+  const plan = generateWeekPlan({
+    profile: makeProfile({
+      daysPerWeek: 2,
+      structures: [
+        { blocks: [{ kind: 'single', size: 1 }, { kind: 'single', size: 1 }, { kind: 'single', size: 1 }] },
+        { blocks: [{ kind: 'single', size: 1 }, { kind: 'single', size: 1 }, { kind: 'single', size: 1 }] },
+      ],
+    }),
+    activities: [],
+    weekStart: WEEK,
+    logs: [],
+    seed: 6,
+    today: WEEK,
+  });
+
+  const target = Object.values(plan.targets).reduce((sum, value) => sum + (value ?? 0), 0);
+  const delivered = plan.balance.reduce((sum, row) => sum + row.planned + row.assist * 0.5, 0);
+  assert.ok(
+    target <= delivered * 1.02,
+    `a 2x3 week should not be judged against more than it delivers: target ${target}, delivers ${delivered}`,
+  );
+  assert.ok(plan.capacity.ratio < 1, 'such a small week is well under the unconstrained ideal');
+  assert.ok(
+    plan.reasoning.some((line) => line.includes('Targets are scaled')),
+    'the user should be told the targets were scaled and why',
+  );
+  assert.ok(!plan.warnings.some((w) => w.includes('fits about')), 'the permanent shortfall warning is gone');
+});

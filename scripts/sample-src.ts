@@ -1,19 +1,36 @@
 import { generateWeekPlan } from '../src/domain/planner';
+import { computeWeekProgress } from '../src/domain/progress';
+import { MUSCLE_LABEL } from '../src/domain/muscles';
 import { makeProfile } from '../tests/fixtures';
-import type { Activity, DayStructure } from '../src/domain/types';
+import type { Activity, DayStructure, SessionLog } from '../src/domain/types';
+
 const activities: Activity[] = [
   { id: 'v1', type: 'volleyball', day: 3, durationMin: 90, intensity: 2 },
   { id: 'v2', type: 'volleyball', day: 4, durationMin: 90, intensity: 2 },
   { id: 'r1', type: 'run_easy', day: 5, durationMin: 45, intensity: 1 },
 ];
 const wide = (n: number): DayStructure => ({ blocks: Array.from({ length: n }, () => ({ kind: 'single' as const, size: 1 })) });
-for (const [label, days, per] of [['2 days x 5', 2, 5], ['2 days x 7', 2, 7], ['2 days x 9', 2, 9], ['3 days x 7', 3, 7]] as [string, 2|3, number][]) {
-  const plan = generateWeekPlan({
-    profile: makeProfile({ daysPerWeek: days, structures: Array.from({ length: days }, () => wide(per)) }),
-    activities, weekStart: '2026-08-24', logs: [], seed: 6, today: '2026-08-24',
-  });
-  const target = plan.balance.reduce((s, r) => s + r.target, 0);
-  const delivered = plan.balance.reduce((s, r) => s + r.planned + r.assist * 0.5, 0);
-  const sets = plan.days.reduce((n, d) => n + d.exercises.reduce((m, e) => m + e.sets, 0), 0);
-  console.log(`${label.padEnd(12)} ${String(sets).padStart(3)} working sets → ${Math.round((delivered / target) * 100)}% of target`);
-}
+const WEEK = '2026-08-24';
+
+const plan = generateWeekPlan({
+  profile: makeProfile({ daysPerWeek: 2, structures: [wide(5), wide(5)] }),
+  activities, weekStart: WEEK, logs: [], seed: 6, today: WEEK,
+});
+
+// Do exactly what the plan says.
+const logs: SessionLog[] = plan.days.map((day, i) => ({
+  id: `${WEEK}#${i}`, weekStart: WEEK, date: day.date, dayIndex: i, title: day.title,
+  completed: true, sessionRpe: 8, durationMin: 60, soreness: {},
+  exercises: day.exercises.map((e) => ({
+    exerciseId: e.exerciseId,
+    sets: Array.from({ length: e.sets }, () => ({ reps: e.repRange[1], weightKg: 50, rpe: 8, done: true })),
+  })),
+}));
+
+const end = '2026-08-31';
+const p = computeWeekProgress(plan, logs, end, 2);
+console.log(`after doing the whole plan: ${Math.round(p.covered * 100)}% of the week's volume, ${p.setsLogged} sets`);
+console.log(`shortfalls remaining: ${p.shortfalls.length}`,
+  p.shortfalls.map((s) => `${MUSCLE_LABEL[s.muscle]} -${s.shortfall}`).join(', '));
+console.log(`\nfresh-plan shortfalls (nothing logged): ${computeWeekProgress(plan, [], WEEK, 2).shortfalls
+  .map((s) => `${MUSCLE_LABEL[s.muscle]} -${s.shortfall}`).join(', ') || 'none'}`);

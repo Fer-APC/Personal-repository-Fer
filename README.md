@@ -28,6 +28,17 @@ plus 2 supersets, or 2 singles plus a superset and a triset, whatever you want. 
 planner fills exactly that shape, puts the heaviest work in the first block, and never
 stacks the same muscle inside one superset.
 
+**Measures you against your own week.** The per-muscle volume targets start from an
+unconstrained ideal — the volume your goal mix would use with unlimited days — and are
+then scaled to what the days and exercises you actually chose can hold. So 100% means a
+full week as you set it up, not a compromise, and completing your sessions reads as done.
+How your week compares with that ideal, and what another day or two more exercises per
+session would add, is stated as information rather than a warning.
+
+Two different gaps are reported separately: work you missed by skipping sessions, and
+muscles your session shape cannot reach at all — the second closes only by changing the
+shape, never by training harder.
+
 **Keeps the week balanced.** The Balance tab shows every muscle's planned sets against
 its target, separating direct work from assistance, and flags anything under-served,
 over-served, or missing entirely.

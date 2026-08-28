@@ -14,6 +14,11 @@ export interface MuscleProgress {
   scheduled: number;
   /** Still uncovered once the rest of the week is done, floored at zero. */
   shortfall: number;
+  /**
+   * The part of that gap the plan never covered in the first place — no amount
+   * of doing the sessions closes it, only a different session shape will.
+   */
+  structural: number;
 }
 
 export interface WeekProgress {
@@ -27,8 +32,10 @@ export interface WeekProgress {
   setsLogged: number;
   /** Share of the week's total target already logged, 0-1. */
   covered: number;
-  /** Muscles the remaining sessions won't get to, worst first. */
+  /** Muscles you will miss because sessions were skipped, worst first. */
   shortfalls: MuscleProgress[];
+  /** Muscles this session shape cannot reach at all, worst first. */
+  structuralGaps: MuscleProgress[];
 }
 
 /** Sessions logged against this week, planned or not. */
@@ -81,18 +88,22 @@ export function computeWeekProgress(
   const logged = consumedThisWeek(logs, plan.weekStart);
   const locked = new Set(lockedDayIndexes(plan, logs, today));
 
-  // Only sessions still ahead of you count as scheduled coverage.
+  // Only sessions still ahead of you count as scheduled coverage; the whole
+  // plan is measured too, to tell "you skipped it" apart from "it was never
+  // in the plan".
   const scheduled: Partial<Record<Muscle, number>> = {};
+  const wholePlan: Partial<Record<Muscle, number>> = {};
   plan.days.forEach((day, index) => {
-    if (locked.has(index)) return;
     for (const exercise of day.exercises) {
       const definition = EXERCISE_BY_ID[exercise.exerciseId];
       if (!definition) continue;
       for (const muscle of definition.primary) {
-        scheduled[muscle] = (scheduled[muscle] ?? 0) + exercise.sets;
+        wholePlan[muscle] = (wholePlan[muscle] ?? 0) + exercise.sets;
+        if (!locked.has(index)) scheduled[muscle] = (scheduled[muscle] ?? 0) + exercise.sets;
       }
       for (const muscle of definition.secondary) {
-        scheduled[muscle] = (scheduled[muscle] ?? 0) + exercise.sets * 0.5;
+        wholePlan[muscle] = (wholePlan[muscle] ?? 0) + exercise.sets * 0.5;
+        if (!locked.has(index)) scheduled[muscle] = (scheduled[muscle] ?? 0) + exercise.sets * 0.5;
       }
     }
   });
@@ -108,6 +119,7 @@ export function computeWeekProgress(
       logged: done,
       scheduled: ahead,
       shortfall: round(Math.max(0, target - done - ahead)),
+      structural: round(Math.max(0, target - (wholePlan[muscle] ?? 0))),
     };
   });
 
@@ -125,8 +137,12 @@ export function computeWeekProgress(
     sessionsRemaining: plan.days.filter((_, index) => !locked.has(index)).length,
     setsLogged,
     covered: totalTarget > 0 ? Math.min(1, totalLogged / totalTarget) : 0,
+    // A gap only counts as "missed" beyond what the plan never covered.
     shortfalls: muscles
-      .filter((m) => m.shortfall >= 1.5 && m.target >= 2)
+      .filter((m) => m.shortfall - m.structural >= 1.5 && m.target >= 2)
       .sort((a, b) => b.shortfall - a.shortfall),
+    structuralGaps: muscles
+      .filter((m) => m.structural >= 1.5 && m.target >= 2)
+      .sort((a, b) => b.structural - a.structural),
   };
 }

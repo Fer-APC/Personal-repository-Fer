@@ -184,8 +184,20 @@ export interface WeekPlan {
   balance: BalanceRow[];
   ratios: { pushPull: number; upperLower: number };
   warnings: string[];
-  /** Per-muscle weekly targets, kept so later revisions can reuse them. */
+  /**
+   * Per-muscle weekly targets, scaled to what this week can actually deliver,
+   * so full completion reads as 100%. Kept so later revisions reuse them.
+   */
   targets: Partial<Record<Muscle, number>>;
+  /** How the week you configured compares with an unconstrained ideal. */
+  capacity: {
+    /** Muscle-sets this week's sessions prescribe. */
+    delivered: number;
+    /** Muscle-sets your goals would use with unlimited days. */
+    ideal: number;
+    /** delivered / ideal, capped at 1. */
+    ratio: number;
+  };
   /** Free-text explanation of the scheduling decisions. */
   reasoning: string[];
 }

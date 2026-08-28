@@ -6,7 +6,7 @@ import type { AppState, Muscle, Profile, SessionLog, WeekPlan } from './types';
 
 const STORAGE_KEY = 'training-tracker/v1';
 /** Bumped whenever stored data needs upgrading; see `migrate`. */
-export const STATE_VERSION = 2;
+export const STATE_VERSION = 3;
 
 export const FULL_GYM: Profile['equipment'] = [
   'barbell', 'dumbbell', 'machine', 'cable', 'bench', 'pullup_bar', 'dip_bars', 'kettlebell', 'bands', 'bodyweight',
@@ -49,13 +49,23 @@ export function defaultState(): AppState {
  */
 function migratePlan(plan: WeekPlan): WeekPlan {
   const balance = plan.balance ?? [];
+  const targets = plan.targets ?? Object.fromEntries(balance.map((row) => [row.muscle, row.target]));
+  // v2 plans predate the capacity summary. Their targets were the unscaled
+  // ideal, so derive the ratio from what the plan delivered; the week is
+  // rebuilt against scaled targets as soon as it is regenerated.
+  const delivered = balance.reduce((sum, row) => sum + row.planned + row.assist * 0.5, 0);
+  const ideal = Object.values(targets).reduce((sum: number, value) => sum + (value ?? 0), 0);
   return {
     ...plan,
     balance,
-    // v1 plans predate per-muscle targets; the balance rows still hold them.
-    targets: plan.targets ?? Object.fromEntries(balance.map((row) => [row.muscle, row.target])),
+    targets,
     // v1 days predate template keys; an empty key falls back to position.
     days: (plan.days ?? []).map((day) => ({ ...day, templateKey: day.templateKey ?? '' })),
+    capacity: plan.capacity ?? {
+      delivered: Math.round(delivered),
+      ideal: Math.round(ideal),
+      ratio: ideal > 0 ? Math.min(1, delivered / ideal) : 1,
+    },
   };
 }
 

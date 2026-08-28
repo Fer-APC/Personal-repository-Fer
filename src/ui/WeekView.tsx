@@ -383,7 +383,7 @@ function ProgressCard({
       {progress.shortfalls.length > 0 ? (
         <>
           <p className="small muted" style={{ marginBottom: 6 }}>
-            Even after the sessions you have left, these end the week under target:
+            Sessions you have missed leave these short for the week:
           </p>
           <div className="row wrap">
             {progress.shortfalls.slice(0, 6).map((row) => (
@@ -396,9 +396,29 @@ function ProgressCard({
       ) : (
         <p className="small muted" style={{ marginBottom: 6 }}>
           {progress.setsLogged > 0
-            ? 'On track — the sessions you have left cover what your goals ask for.'
-            : "Nothing logged yet. The sessions below cover the week as planned."}
+            ? 'On track — the sessions you have left cover the rest of the week.'
+            : 'Nothing logged yet. The sessions below cover the week as planned.'}
         </p>
+      )}
+
+      {progress.structuralGaps.length > 0 && (
+        <details className="why-week" style={{ marginTop: 10 }}>
+          <summary>
+            {progress.structuralGaps.length} muscle{progress.structuralGaps.length === 1 ? '' : 's'} your
+            session shape can’t reach
+          </summary>
+          <p className="tiny muted" style={{ marginTop: 8, marginBottom: 6 }}>
+            Doing every session still leaves these below what your goals would ideally use — there is not
+            room for them in the exercises you have per day. More slots, or another day, is the only fix.
+          </p>
+          <div className="row wrap">
+            {progress.structuralGaps.slice(0, 6).map((row) => (
+              <Chip key={row.muscle}>
+                {MUSCLE_LABEL[row.muscle]} −{row.structural}
+              </Chip>
+            ))}
+          </div>
+        </details>
       )}
 
       {extras.length > 0 && (
