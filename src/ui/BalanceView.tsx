@@ -11,17 +11,19 @@ const REGION_LABEL: Record<Region, string> = {
   push: 'Push', pull: 'Pull', legs: 'Legs', core: 'Core & trunk',
 };
 
-type Status = 'done' | 'on track' | 'short' | 'not reached';
+type Status = 'done' | 'on track' | 'short' | 'not reached' | 'extra';
 
 function statusOf(row: MuscleProgress): Status {
-  if (row.target <= 0) return 'done';
+  // No target is not the same as target met — it means the week never asked
+  // for this muscle, usually because you are working around it.
+  if (row.target <= 0) return 'extra';
   if (row.logged >= row.target * 0.85) return 'done';
   if (row.logged + row.scheduled >= row.target * 0.85) return 'on track';
   return row.structural >= row.target * 0.5 ? 'not reached' : 'short';
 }
 
-const STATUS_TONE: Record<Status, 'good' | 'accent' | 'warn' | 'danger'> = {
-  done: 'good', 'on track': 'accent', short: 'warn', 'not reached': 'danger',
+const STATUS_TONE: Record<Status, 'good' | 'accent' | 'warn' | 'danger' | 'default'> = {
+  done: 'good', 'on track': 'accent', short: 'warn', 'not reached': 'danger', extra: 'default',
 };
 
 export function BalanceView() {
@@ -153,7 +155,7 @@ function MuscleBar({ row, credit }: { row: MuscleProgress; credit: number }) {
         <div className="tiny muted" style={{ marginTop: 3 }}>
           {row.logged} done
           {row.scheduled > 0 ? ` + ${row.scheduled} to come` : ''}
-          {` · target ${row.target}`}
+          {row.target > 0 ? ` · target ${row.target}` : ' · no target this week'}
           {credit > 0 ? ` · sport adds ~${credit}` : ''}
         </div>
       </div>

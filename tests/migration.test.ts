@@ -115,3 +115,49 @@ test('a plan saved before capacity tracking still loads and renders', () => {
   assert.equal(migrated.version, STATE_VERSION);
   assert.doesNotThrow(() => computeWeekProgress(restored, [], WEEK, 3));
 });
+
+test('a stored plan with no targets at all is discarded so the week rebuilds', () => {
+  // An earlier release zeroed every target once a week ran out of gym days.
+  // Such a plan reports every muscle as satisfied against a target of zero.
+  const plan = currentPlan();
+  const zeroed = { ...plan, targets: Object.fromEntries(Object.keys(plan.targets).map((m) => [m, 0])) };
+
+  const logs = [
+    {
+      id: `${WEEK}#0`,
+      weekStart: WEEK,
+      date: WEEK,
+      dayIndex: 0,
+      title: 'Session',
+      completed: true,
+      sessionRpe: 8,
+      durationMin: 60,
+      soreness: {},
+      exercises: [{ exerciseId: 'bb_bench', sets: [{ reps: 8, weightKg: 60, rpe: 8, done: true }] }],
+    },
+  ];
+  const migrated = migrate({ version: 3, plans: { [WEEK]: zeroed as WeekPlan }, logs });
+  assert.equal(migrated.plans[WEEK], undefined, 'the unusable plan should not survive the load');
+  assert.deepEqual(Object.keys(migrated.plans), [], 'so the week regenerates from scratch');
+  // Plans are rebuildable; the training you logged is not.
+  assert.equal(migrated.logs.length, 1, 'discarding a plan must never discard logged sessions');
+  assert.equal(migrated.logs[0]!.exercises[0]!.exerciseId, 'bb_bench');
+});
+
+test('a healthy plan is never discarded', () => {
+  const plan = currentPlan();
+  const migrated = migrate({ version: 3, plans: { [WEEK]: plan } });
+  assert.ok(migrated.plans[WEEK], 'a plan with real targets must be kept');
+  assert.deepEqual(migrated.plans[WEEK]!.targets, plan.targets);
+});
+
+test('a deload week keeps its reduced but real targets', () => {
+  const plan = currentPlan();
+  const deloaded = {
+    ...plan,
+    deload: true,
+    targets: Object.fromEntries(Object.entries(plan.targets).map(([m, v]) => [m, (v ?? 0) * 0.5])),
+  };
+  const migrated = migrate({ version: 3, plans: { [WEEK]: deloaded as WeekPlan } });
+  assert.ok(migrated.plans[WEEK], 'a light week is still a usable week');
+});

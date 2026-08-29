@@ -69,10 +69,23 @@ function migratePlan(plan: WeekPlan): WeekPlan {
   };
 }
 
+/**
+ * A plan whose every target is zero cannot be read or acted on: nothing has a
+ * yardstick and every muscle reports as satisfied. An earlier release could
+ * produce one when a week ran out of gym days. Plans are derived data, so the
+ * repair is to drop it and let the week rebuild.
+ */
+function isUnusable(plan: WeekPlan): boolean {
+  const targets = Object.values(plan.targets ?? {});
+  return targets.length > 0 && targets.every((value) => (value ?? 0) === 0);
+}
+
 export function migrate(parsed: Partial<AppState>): AppState {
   const base = defaultState();
   const plans = Object.fromEntries(
-    Object.entries(parsed.plans ?? {}).map(([week, plan]) => [week, migratePlan(plan)]),
+    Object.entries(parsed.plans ?? {})
+      .map(([week, plan]) => [week, migratePlan(plan)] as const)
+      .filter(([, plan]) => !isUnusable(plan)),
   );
   return {
     ...base,
