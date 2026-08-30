@@ -159,6 +159,25 @@ export interface ParseResult {
   commands: Command[];
   /** Fragments that matched nothing, shown so the user knows what was dropped. */
   unrecognised: string[];
+  /**
+   * A request to look at something rather than change it. Kept apart from
+   * commands because it alters nothing — it just says which week to open.
+   */
+  navigate?: { weekOffset: number; summary: string };
+}
+
+/** "show me next week", "what's my routine", "give me this week's plan". */
+function parseNavigation(clause: string): { weekOffset: number; summary: string } | null {
+  const asking = /\b(show|give|see|view|open|display|what|which|tell|where|go to)\b/.test(clause);
+  const subject = /\b(week|routine|plan|program|programme|schedule|workout|session)\b/.test(clause);
+  if (!asking || !subject) return null;
+
+  // Anything that also sets something is a change, not a request to look.
+  if (/\b(sets? of|reps?|kilos?|kg|sore|hurts?|cant|cannot)\b/.test(clause)) return null;
+
+  if (/\bnext\b/.test(clause)) return { weekOffset: 1, summary: 'Open next week' };
+  if (/\b(last|previous|past)\b/.test(clause)) return { weekOffset: -1, summary: 'Open last week' };
+  return { weekOffset: 0, summary: 'Open this week' };
 }
 
 const WEEKDAY_WORDS: Record<string, Weekday> = {
@@ -333,6 +352,7 @@ export function parseVoiceInput(text: string, today: string): ParseResult {
 
   const commands: Command[] = [];
   const unrecognised: string[] = [];
+  let navigate: ParseResult['navigate'];
   // A date said once ("on monday I did …") applies to everything after it.
   let contextDate: string | null = null;
 
@@ -361,7 +381,13 @@ export function parseVoiceInput(text: string, today: string): ParseResult {
       }
 
       if (parsed.commands.length === 0) {
-        unrecognised.push(rest.trim());
+        // Before giving up, see whether this is a request to look at something.
+        const asked = parseNavigation(rest.trim());
+        if (asked) {
+          navigate = asked;
+        } else {
+          unrecognised.push(rest.trim());
+        }
         break;
       }
       for (const command of parsed.commands) {
@@ -372,7 +398,7 @@ export function parseVoiceInput(text: string, today: string): ParseResult {
     }
   }
 
-  return { commands, unrecognised };
+  return navigate ? { commands, unrecognised, navigate } : { commands, unrecognised };
 }
 
 interface ClauseParse {

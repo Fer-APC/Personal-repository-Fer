@@ -75,21 +75,26 @@ export function WeekView({ onOpenSession }: { onOpenSession: (logId: string) => 
             {plan.deload ? ' · deload' : ''}
           </div>
         </div>
-        <div className="row">
-          <button
-            type="button"
-            className="tiny-btn"
-            onClick={() => setDictating(true)}
-            aria-label="Dictate a change or a session"
-          >
-            🎤
-          </button>
-          <button type="button" className="tiny-btn" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Previous week">‹</button>
-          {!isThisWeek && (
-            <button type="button" className="tiny-btn" onClick={() => setWeekStart(weekStartISO(new Date()))}>Today</button>
-          )}
-          <button type="button" className="tiny-btn" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Next week">›</button>
-        </div>
+        <button
+          type="button"
+          className="tiny-btn"
+          onClick={() => setDictating(true)}
+          aria-label="Dictate a change or a session"
+        >
+          🎤
+        </button>
+      </div>
+
+      <div className="week-nav">
+        <button type="button" onClick={() => setWeekStart(addDays(weekStart, -7))}>‹ Previous</button>
+        <button
+          type="button"
+          disabled={isThisWeek}
+          onClick={() => setWeekStart(weekStartISO(new Date()))}
+        >
+          {isThisWeek ? weekLabel : 'This week'}
+        </button>
+        <button type="button" onClick={() => setWeekStart(addDays(weekStart, 7))}>Next ›</button>
       </div>
 
       {store.isStale(weekStart) && (
@@ -147,7 +152,12 @@ export function WeekView({ onOpenSession }: { onOpenSession: (logId: string) => 
         </button>
       </div>
 
-      {dictating && <VoiceCommand onClose={() => setDictating(false)} />}
+      {dictating && (
+        <VoiceCommand
+          onShowWeek={(offset) => setWeekStart(addDays(weekStart, offset * 7))}
+          onClose={() => setDictating(false)}
+        />
+      )}
     </>
   );
 }

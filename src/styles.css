@@ -351,3 +351,22 @@ details.why-week li { margin-bottom: 5px; }
 .card-summary::-webkit-details-marker { display: none; }
 .card-summary .chevron { color: var(--muted); font-size: 20px; transition: transform 0.15s ease; }
 details[open] > .card-summary .chevron { transform: rotate(90deg); }
+
+/* Moving between weeks was hidden behind two unlabelled chevrons. */
+.week-nav {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.week-nav button {
+  font-size: 13.5px;
+  padding: 10px 8px;
+  white-space: nowrap;
+}
+.week-nav button:disabled {
+  opacity: 1;
+  color: var(--muted);
+  background: transparent;
+  border-color: transparent;
+}

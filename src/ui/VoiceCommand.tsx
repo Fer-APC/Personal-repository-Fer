@@ -19,7 +19,14 @@ const EXAMPLES = [
  * is confirmed — speech recognition misfires, and silently writing the wrong
  * weight into a training log is worse than not logging it at all.
  */
-export function VoiceCommand({ targetLogId, onClose }: { targetLogId?: string; onClose: () => void }) {
+export function VoiceCommand({
+  targetLogId, onShowWeek, onClose,
+}: {
+  targetLogId?: string;
+  /** Act on a request to look at another week, rather than change something. */
+  onShowWeek?: (weekOffset: number) => void;
+  onClose: () => void;
+}) {
   const store = useStore();
   const today = toISODate(new Date());
   const [text, setText] = useState('');
@@ -78,7 +85,15 @@ export function VoiceCommand({ targetLogId, onClose }: { targetLogId?: string; o
         </p>
       )}
 
-      {speech.error && <div className="banner warn" style={{ marginTop: 10 }}>{speech.error}</div>}
+      {speech.error && (
+        <div className="banner warn" style={{ marginTop: 10 }}>
+          {speech.error}
+          <div style={{ marginTop: 6 }}>
+            Dictation is often blocked inside an embedded page. Typing works the same, and your keyboard’s own
+            microphone button works in the box below.
+          </div>
+        </div>
+      )}
 
       <textarea
         value={text + (speech.interim ? ` ${speech.interim}` : '')}
@@ -122,12 +137,32 @@ export function VoiceCommand({ targetLogId, onClose }: { targetLogId?: string; o
         </div>
       )}
 
+      {parsed.navigate && onShowWeek && (
+        <div style={{ marginTop: 14 }}>
+          <h3>You asked to look, not to change</h3>
+          <button
+            type="button"
+            className="wide primary"
+            onClick={() => {
+              onShowWeek(parsed.navigate!.weekOffset);
+              onClose();
+            }}
+          >
+            {parsed.navigate.summary}
+          </button>
+        </div>
+      )}
+
       {parsed.unrecognised.length > 0 && (
         <div style={{ marginTop: 12 }}>
           <h3>Not understood</h3>
           {parsed.unrecognised.map((fragment) => (
             <div key={fragment} className="tiny muted">“{fragment}” — ignored</div>
           ))}
+          <p className="small muted" style={{ marginTop: 8 }}>
+            This box records things and changes settings — sessions you did, soreness, goals, which days you
+            train. It is not a chat: to read a routine, use the week arrows at the top of the Week screen.
+          </p>
         </div>
       )}
 

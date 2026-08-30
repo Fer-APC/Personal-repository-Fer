@@ -273,3 +273,34 @@ test('large spoken loads survive', () => {
   assert.ok(command?.kind === 'log_exercise' && command.weightKg === 140);
   assert.equal(command.kind === 'log_exercise' && command.date, '2026-08-26');
 });
+
+test('asking to see a routine is understood as a request, not an error', () => {
+  // The box only ever changed things, so a question could only be "ignored".
+  const asked = parse('Give me the 2 day routine for this week');
+  assert.ok(asked.navigate, 'it should recognise a request to look at the week');
+  assert.equal(asked.navigate?.weekOffset, 0);
+  assert.equal(asked.unrecognised.length, 0, 'and not report it as gibberish');
+
+  const next = parse('show me next week');
+  assert.equal(next.navigate?.weekOffset, 1);
+
+  const previous = parse('what was my plan last week');
+  assert.equal(previous.navigate?.weekOffset, -1);
+});
+
+test('a request to look never swallows a real change', () => {
+  // "give me two days a week" is an instruction, not a request to look.
+  const change = parse('I want to train two days a week');
+  assert.equal(change.commands[0]?.kind, 'set_days');
+  assert.equal(change.navigate, undefined);
+
+  const logging = parse('show me bench press three sets of eight at sixty kilos');
+  assert.equal(logging.commands[0]?.kind, 'log_exercise');
+});
+
+test('genuine gibberish is still reported', () => {
+  const result = parse('asdf qwerty nonsense');
+  assert.equal(result.commands.length, 0);
+  assert.equal(result.navigate, undefined);
+  assert.ok(result.unrecognised.length > 0);
+});
