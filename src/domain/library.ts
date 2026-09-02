@@ -109,6 +109,7 @@ export function rateExercisesFor(muscle: Muscle, options: RateOptions): Exercise
 
   const rated = pool
     .filter((exercise) => exercise.primary.includes(muscle))
+    .filter((exercise) => !(profile.limitedSpace && exercise.needsSpace))
     .map((exercise) => {
       const breadth = breadthOf(exercise);
       const goalFit = goalFitScore(exercise.goalFit, profile.goals);
@@ -159,11 +160,24 @@ export function buildLibrary(options: RateOptions & { region?: Region | 'all'; q
  * What to do instead when the equipment is taken: same muscles, different
  * implement, ranked the same way and never needing the same station.
  */
-export function standInsFor(exercise: Exercise, options: RateOptions, limit = 6): ExerciseRating[] {
+export interface StandInOptions extends RateOptions {
+  limit?: number;
+  /**
+   * True when the station is occupied, so a stand-in must not need any of the
+   * same equipment. False when you simply want a different exercise for the
+   * slot, where swapping a barbell row for a T-bar row is a fine answer.
+   */
+  equipmentBusy?: boolean;
+}
+
+export function standInsFor(exercise: Exercise, options: StandInOptions): ExerciseRating[] {
+  const limit = options.limit ?? 6;
   // If the station is taken, every piece it uses is unavailable — suggesting a
   // dumbbell bench press when the bench is occupied helps nobody. Only
   // bodyweight is always free.
-  const contested = new Set<Equipment>(exercise.equipment.filter((e) => e !== 'bodyweight'));
+  const contested = new Set<Equipment>(
+    options.equipmentBusy === false ? [] : exercise.equipment.filter((e) => e !== 'bodyweight'),
+  );
 
   /**
    * How much of what the original trains the candidate actually replaces.

@@ -163,7 +163,17 @@ export function SetupView() {
         />
       </CollapsibleCard>
 
-      <CollapsibleCard title="Work around" summary="injuries and banned exercises">
+      <CollapsibleCard title="Work around" summary="space, injuries and banned exercises">
+        <FieldGroup label="Gym space" hint="drops carries and travelling lunges">
+          <button
+            type="button"
+            className="toggle"
+            aria-pressed={profile.limitedSpace}
+            onClick={() => store.updateProfile({ limitedSpace: !profile.limitedSpace })}
+          >
+            {profile.limitedSpace ? 'No room to walk with weight' : 'I have room to walk with weight'}
+          </button>
+        </FieldGroup>
         <FieldGroup label="Muscles to leave alone" hint="niggles and injuries">
           <Toggles
             options={ALL_MUSCLES.map((muscle) => ({ value: muscle, label: MUSCLE_LABEL[muscle] }))}

@@ -186,6 +186,7 @@ function scoreExercise(
   if (profile.excludedExercises.includes(exercise.id)) return -Infinity;
   if (exercise.primary.some((m) => profile.avoid.includes(m))) return -Infinity;
   if (profile.experience === 'beginner' && exercise.skill === 3) return -Infinity;
+  if (profile.limitedSpace && exercise.needsSpace) return -Infinity;
   if (
     !relax.lowerBody &&
     isLowerBody(exercise) &&
@@ -240,6 +241,18 @@ function scoreExercise(
     if (opposed) score *= 1.3;
     if (exercise.systemicCost >= 2.2) score *= 0.3; // don't pair two spine-loading lifts
   }
+
+  // Variety within the session. Nothing stopped three rows landing in one day:
+  // each satisfied a different muscle's demand, and no rule noticed they were
+  // the same movement. Repeats are allowed but have to earn their slot.
+  const samePattern = state.chosen.filter((e) => e.pattern === exercise.pattern).length;
+  if (samePattern === 1) score *= 0.5;
+  else if (samePattern >= 2) score *= 0.12;
+
+  const sameTarget = state.chosen.filter((e) =>
+    e.primary.some((m) => exercise.primary.includes(m)),
+  ).length;
+  if (sameTarget >= 2) score *= 0.45;
 
   // Requirement urgency: guarantee movement-pattern coverage before variety.
   const meetsRequirement = [...state.unmetRequirements].some((i) =>

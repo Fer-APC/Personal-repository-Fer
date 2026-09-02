@@ -268,3 +268,34 @@ test('heavy overhead sport steers pressing towards shoulder-friendly options', (
     'a week full of spiking should not also prescribe the harshest presses',
   );
 });
+
+test('a session does not repeat the same movement three times', () => {
+  // Three rows in one day: each satisfied a different muscle, and nothing
+  // noticed they were the same movement.
+  for (const seed of [1, 2, 3, 4, 5]) {
+    const result = plan({}, RUNS_AND_VOLLEY, seed);
+    for (const day of result.days) {
+      const counts = new Map<string, number>();
+      for (const exercise of day.exercises) {
+        const { pattern } = EXERCISE_BY_ID[exercise.exerciseId]!;
+        counts.set(pattern, (counts.get(pattern) ?? 0) + 1);
+      }
+      for (const [pattern, count] of counts) {
+        assert.ok(count <= 2, `${day.title} has ${count} × ${pattern} (seed ${seed})`);
+      }
+    }
+  }
+});
+
+test('a cramped gym is never prescribed a walking exercise', () => {
+  const result = plan({ limitedSpace: true }, RUNS_AND_VOLLEY);
+  for (const day of result.days) {
+    for (const exercise of day.exercises) {
+      assert.ok(
+        !EXERCISE_BY_ID[exercise.exerciseId]!.needsSpace,
+        `${EXERCISE_BY_ID[exercise.exerciseId]!.name} needs floor space`,
+      );
+    }
+    assert.ok(day.exercises.length > 0, 'the day still has to be filled');
+  }
+});

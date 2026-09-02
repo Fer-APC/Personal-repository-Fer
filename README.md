@@ -64,6 +64,11 @@ rating explained: how well it fits your goals, how much muscle it trains per set
 much room you have left to progress on it. Externally loaded lifts never run out;
 bodyweight work runs out when its ladder does.
 
+**Respects the room you train in.** Setup → Work around has a switch for a gym with no
+space to walk with weight; carries and travelling lunges are then never prescribed.
+Supersets prefer partners that use kit you already have in your hands, so a superset does
+not send you across the floor and back.
+
 **Answers "someone is on that machine".** Every exercise — in the library, on the plan,
 and inside a session you are logging — offers stand-ins that train the same muscles,
 keep the same movement pattern where possible, and need none of the same equipment. If

@@ -139,3 +139,38 @@ test('stand-ins offer variety, not one ladder four times', () => {
   const families = options.map((r) => r.exercise.progression).filter(Boolean);
   assert.equal(new Set(families).size, families.length, 'each progression family should appear once');
 });
+
+test('swapping for a different exercise keeps the same muscles', () => {
+  // The week-screen swap used to accept anything sharing a movement pattern,
+  // so replacing an overhead carry offered a farmer's carry — same pattern,
+  // entirely different muscles.
+  const carry = EXERCISE_BY_ID['overhead_carry']!;
+  const options = standInsFor(carry, { ...opts(), equipmentBusy: false });
+  assert.ok(options.length > 0);
+  for (const { exercise } of options) {
+    const shared = carry.primary.filter(
+      (m) => exercise.primary.includes(m) || exercise.secondary.includes(m),
+    );
+    assert.ok(shared.length > 0, `${exercise.name} trains none of what the overhead carry trains`);
+  }
+});
+
+test('a plan-time swap may reuse the same equipment', () => {
+  // Not working around a busy machine: barbell row for T-bar row is fine.
+  const row = EXERCISE_BY_ID['bb_row']!;
+  const forSlot = standInsFor(row, { ...opts(), equipmentBusy: false });
+  const forBusyRack = standInsFor(row, { ...opts(), equipmentBusy: true });
+  assert.ok(forSlot.some((r) => r.exercise.equipment.includes('barbell')), 'same kit should be allowed');
+  assert.ok(!forBusyRack.some((r) => r.exercise.equipment.includes('barbell')), 'busy kit must be avoided');
+});
+
+test('a cramped gym drops exercises you have to walk with', () => {
+  const cramped = makeProfile({ limitedSpace: true });
+  for (const muscle of ['traps', 'quads', 'obliques'] as const) {
+    for (const { exercise } of rateExercisesFor(muscle, opts(cramped))) {
+      assert.ok(!exercise.needsSpace, `${exercise.name} needs room to travel`);
+    }
+  }
+  // And there is still something to do for those muscles.
+  assert.ok(rateExercisesFor('quads', opts(cramped)).length > 3);
+});

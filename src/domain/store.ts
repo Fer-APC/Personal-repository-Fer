@@ -24,6 +24,7 @@ export function defaultProfile(): Profile {
     bodyweightKg: 75,
     structures: [DEFAULT_STRUCTURE, DEFAULT_STRUCTURE, DEFAULT_STRUCTURE],
     avoid: [],
+    limitedSpace: false,
     excludedExercises: [],
     deloadEveryWeeks: 6,
   };

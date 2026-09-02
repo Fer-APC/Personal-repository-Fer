@@ -3,7 +3,7 @@ import { useStore } from '../app/state';
 import { EXERCISE_BY_ID } from '../domain/exercises';
 import { MUSCLE_LABEL } from '../domain/muscles';
 import { ACTIVITY_LABEL } from '../domain/activities';
-import { alternativesFor } from '../domain/swap';
+import { standInsFor } from '../domain/library';
 import { computeWeekProgress } from '../domain/progress';
 import { sessionIdFor } from '../domain/store';
 import { WEEKDAY_LABEL, addDays, formatDayLabel, fromISODate, toISODate, weekStartISO } from '../domain/date';
@@ -306,12 +306,16 @@ function SwapModal({
   const current = planned ? EXERCISE_BY_ID[planned.exerciseId] : undefined;
   const options = useMemo(() => {
     if (!current) return [];
-    return alternativesFor(
-      current,
-      store.state.profile,
-      store.state.logs,
-      day.exercises.map((e) => e.exerciseId),
-    );
+    return standInsFor(current, {
+      profile: store.state.profile,
+      logs: store.state.logs,
+      // Choosing a different exercise for the slot, not working around a busy
+      // machine — so the same equipment is fine here.
+      equipmentBusy: false,
+      limit: 8,
+    })
+      .filter((rating) => !day.exercises.some((e) => e.exerciseId === rating.exercise.id))
+      .map((rating) => rating.exercise);
   }, [current, store.state.profile, store.state.logs, day.exercises]);
 
   if (!current) return null;

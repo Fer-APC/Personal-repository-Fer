@@ -31,6 +31,7 @@ export function SwapDuringSession({
             profile: store.state.profile,
             logs: store.state.logs,
             ...(plan ? { plan } : {}),
+            equipmentBusy: true,
           })
         : [],
     [exercise, store.state.profile, store.state.logs, plan],

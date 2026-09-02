@@ -19,6 +19,7 @@ interface Def {
   shoulderStress?: number;
   goalFit: Partial<Record<Goal, number>>;
   skill?: 1 | 2 | 3;
+  needsSpace?: boolean;
   loadType?: LoadType;
   progression?: string;
   progressionStep?: number;
@@ -44,6 +45,7 @@ function E(d: Def): Exercise {
     shoulderStress: d.shoulderStress ?? 0,
     goalFit: d.goalFit,
     skill: d.skill ?? 1,
+    ...(d.needsSpace ? { needsSpace: true } : {}),
     loadType: d.loadType ?? 'external',
     ...(d.progression ? { progression: d.progression, progressionStep: d.progressionStep ?? 1 } : {}),
     ...(d.notes ? { notes: d.notes } : {}),
@@ -131,17 +133,17 @@ export const EXERCISES: Exercise[] = [
 
   // ---------------------------------------------------------------- lunge
   E({ id: 'bulgarian_split_squat', name: 'Bulgarian split squat', pattern: 'lunge', primary: ['quads', 'glutes'], secondary: ['hamstrings', 'adductors', 'abs'], equipment: ['dumbbell', 'bench'], compound: true, unilateral: true, systemicCost: 2, kneeStress: 1.3, goalFit: g(0.9, 0.65, 0.5, 0.7, 0.9) }),
-  E({ id: 'walking_lunge', name: 'Walking lunge', pattern: 'lunge', primary: ['quads', 'glutes'], secondary: ['hamstrings', 'calves', 'adductors'], equipment: ['dumbbell'], compound: true, unilateral: true, systemicCost: 1.8, kneeStress: 1.2, goalFit: g(0.75, 0.5, 0.55, 0.9, 0.85) }),
+  E({ id: 'walking_lunge', needsSpace: true, name: 'Walking lunge', pattern: 'lunge', primary: ['quads', 'glutes'], secondary: ['hamstrings', 'calves', 'adductors'], equipment: ['dumbbell'], compound: true, unilateral: true, systemicCost: 1.8, kneeStress: 1.2, goalFit: g(0.75, 0.5, 0.55, 0.9, 0.85) }),
   E({ id: 'reverse_lunge', name: 'Reverse lunge', pattern: 'lunge', primary: ['glutes', 'quads'], secondary: ['hamstrings', 'adductors'], equipment: ['dumbbell'], compound: true, unilateral: true, systemicCost: 1.5, kneeStress: 0.8, goalFit: g(0.75, 0.5, 0.55, 0.8, 0.95), notes: 'Knee-friendlier than forward lunges on tired running legs.' }),
   E({ id: 'step_up', name: 'Step-up', pattern: 'lunge', primary: ['quads', 'glutes'], secondary: ['calves', 'hamstrings'], equipment: ['dumbbell', 'bench'], compound: true, unilateral: true, systemicCost: 1.4, kneeStress: 1, goalFit: g(0.7, 0.5, 0.6, 0.85, 0.95) }),
   E({ id: 'lateral_lunge', name: 'Lateral lunge', pattern: 'lunge', primary: ['adductors', 'glutes'], secondary: ['quads', 'hamstrings'], equipment: ['dumbbell'], compound: true, unilateral: true, systemicCost: 1.3, kneeStress: 0.9, goalFit: g(0.55, 0.4, 0.6, 0.8, 1), notes: 'Frontal-plane work — exactly the plane beach volley loads and running never does.' }),
   E({ id: 'split_squat', name: 'Static split squat', pattern: 'lunge', primary: ['quads', 'glutes'], secondary: ['adductors', 'abs'], equipment: ['dumbbell'], compound: true, unilateral: true, systemicCost: 1.4, kneeStress: 1, goalFit: g(0.75, 0.55, 0.55, 0.75, 0.9) }),
 
   // ---------------------------------------------------------------- carry
-  E({ id: 'farmers_carry', name: "Farmer's carry", pattern: 'carry', primary: ['forearms', 'traps'], secondary: ['abs', 'obliques', 'upper_back', 'glutes'], equipment: ['dumbbell', 'kettlebell'], compound: true, loadType: 'time', systemicCost: 1.6, goalFit: g(0.5, 0.75, 0.6, 0.9, 1) }),
-  E({ id: 'suitcase_carry', name: 'Suitcase carry', pattern: 'carry', primary: ['obliques', 'forearms'], secondary: ['abs', 'traps', 'glutes'], equipment: ['dumbbell', 'kettlebell'], unilateral: true, loadType: 'time', systemicCost: 1.3, goalFit: g(0.45, 0.6, 0.6, 0.85, 1) }),
-  E({ id: 'front_rack_carry', name: 'Front-rack carry', pattern: 'carry', primary: ['abs', 'upper_back'], secondary: ['obliques', 'forearms', 'traps'], equipment: ['kettlebell', 'dumbbell'], compound: true, loadType: 'time', systemicCost: 1.4, goalFit: g(0.4, 0.6, 0.6, 0.85, 0.95) }),
-  E({ id: 'overhead_carry', name: 'Overhead carry', pattern: 'carry', primary: ['side_delts', 'abs'], secondary: ['front_delts', 'traps', 'rotator_cuff'], equipment: ['kettlebell', 'dumbbell'], compound: true, loadType: 'time', systemicCost: 1.3, shoulderStress: 1.2, goalFit: g(0.4, 0.6, 0.65, 0.8, 0.95) }),
+  E({ id: 'farmers_carry', needsSpace: true, name: "Farmer's carry", pattern: 'carry', primary: ['forearms', 'traps'], secondary: ['abs', 'obliques', 'upper_back', 'glutes'], equipment: ['dumbbell', 'kettlebell'], compound: true, loadType: 'time', systemicCost: 1.6, goalFit: g(0.5, 0.75, 0.6, 0.9, 1) }),
+  E({ id: 'suitcase_carry', needsSpace: true, name: 'Suitcase carry', pattern: 'carry', primary: ['obliques', 'forearms'], secondary: ['abs', 'traps', 'glutes'], equipment: ['dumbbell', 'kettlebell'], unilateral: true, loadType: 'time', systemicCost: 1.3, goalFit: g(0.45, 0.6, 0.6, 0.85, 1) }),
+  E({ id: 'front_rack_carry', needsSpace: true, name: 'Front-rack carry', pattern: 'carry', primary: ['abs', 'upper_back'], secondary: ['obliques', 'forearms', 'traps'], equipment: ['kettlebell', 'dumbbell'], compound: true, loadType: 'time', systemicCost: 1.4, goalFit: g(0.4, 0.6, 0.6, 0.85, 0.95) }),
+  E({ id: 'overhead_carry', needsSpace: true, name: 'Overhead carry', pattern: 'carry', primary: ['side_delts', 'abs'], secondary: ['front_delts', 'traps', 'rotator_cuff'], equipment: ['kettlebell', 'dumbbell'], compound: true, loadType: 'time', systemicCost: 1.3, shoulderStress: 1.2, goalFit: g(0.4, 0.6, 0.65, 0.8, 0.95) }),
 
   // ---------------------------------------------------------------- core
   E({ id: 'hanging_leg_raise', name: 'Hanging leg raise', pattern: 'core', primary: ['abs', 'hip_flexors'], secondary: ['obliques', 'forearms'], equipment: ['pullup_bar'], systemicCost: 1, loadType: 'bodyweight', skill: 2, goalFit: g(0.7, 0.5, 1, 0.7, 0.7) }),

@@ -75,6 +75,8 @@ export interface Exercise {
   goalFit: Partial<Record<Goal, number>>;
   /** Technical demand: 1 anyone, 2 some training age, 3 advanced. */
   skill: 1 | 2 | 3;
+  /** Needs floor space to travel through — carries, walking lunges. */
+  needsSpace?: boolean;
   loadType: LoadType;
   /** Calisthenics ladders: same family id, ordered by step. */
   progression?: string;
@@ -120,6 +122,8 @@ export interface Profile {
   structures: DayStructure[];
   /** Muscles to work around (niggles, injuries). */
   avoid: Muscle[];
+  /** True when the gym has no room to walk a carry or a travelling lunge. */
+  limitedSpace: boolean;
   /** Exercises the user has banned. */
   excludedExercises: string[];
   deloadEveryWeeks: number;
