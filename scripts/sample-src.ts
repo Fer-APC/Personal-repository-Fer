@@ -1,23 +1,17 @@
-import { standInsFor, rateExercisesFor } from '../src/domain/library';
+/** Prints the exercise library ranking — handy when tuning the ratings. */
+import { rateExercisesFor, standInsFor } from '../src/domain/library';
 import { EXERCISE_BY_ID } from '../src/domain/exercises';
+import { MUSCLE_LABEL, ALL_MUSCLES } from '../src/domain/muscles';
 import { makeProfile } from '../tests/fixtures';
 
-const options = { profile: makeProfile({ limitedSpace: true }), logs: [], equipmentBusy: false, limit: 8 };
-const ex = EXERCISE_BY_ID['trap_bar_dl']!;
-console.log('trap-bar deadlift primary:', ex.primary.join(', '));
-const alts = standInsFor(ex, options);
-console.log('stand-ins returned:', alts.length, alts.map((r) => r.exercise.name));
-
-console.log('\ncandidate pool per primary muscle:');
-for (const m of ex.primary) {
-  const rated = rateExercisesFor(m, options);
-  console.log(`  ${m}: ${rated.length} rated`);
+const options = { profile: makeProfile(), logs: [] };
+for (const muscle of ALL_MUSCLES) {
+  const rated = rateExercisesFor(muscle, options);
+  if (rated.length === 0) continue;
+  console.log(`${MUSCLE_LABEL[muscle].padEnd(14)} ${rated.filter((r) => r.tier === 'staple').map((r) => r.exercise.name).join(', ')}`);
 }
-
-// Reproduce the overlap filter by hand.
-const overlap = (c: typeof ex) =>
-  ex.primary.reduce((s, m) => s + (c.primary.includes(m) ? 1 : c.secondary.includes(m) ? 0.5 : 0), 0) / ex.primary.length;
-for (const id of ['back_squat', 'bulgarian_split_squat', 'rdl', 'leg_press', 'deadlift']) {
-  const c = EXERCISE_BY_ID[id]!;
-  console.log(`  overlap(${c.name}) = ${overlap(c).toFixed(2)}  pattern=${c.pattern} vs ${ex.pattern}`);
+console.log('\nStand-ins when the station is busy:');
+for (const id of ['bb_bench', 'back_squat', 'lat_pulldown']) {
+  const ex = EXERCISE_BY_ID[id]!;
+  console.log(`  ${ex.name} → ${standInsFor(ex, { ...options, equipmentBusy: true }).map((r) => r.exercise.name).join(', ')}`);
 }

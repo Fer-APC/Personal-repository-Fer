@@ -174,3 +174,30 @@ test('a cramped gym drops exercises you have to walk with', () => {
   // And there is still something to do for those muscles.
   assert.ok(rateExercisesFor('quads', opts(cramped)).length > 3);
 });
+
+test('each muscle is led by the movement that actually builds it', () => {
+  // Rows outranked pull-ups for the lats, so lats and upper back returned the
+  // same exercises and sessions filled up with rows.
+  const lats = rateExercisesFor('lats', opts());
+  assert.equal(lats[0]!.exercise.pattern, 'vertical_pull', `lats led by ${lats[0]!.exercise.name}`);
+
+  const upperBack = rateExercisesFor('upper_back', opts());
+  assert.equal(upperBack[0]!.exercise.pattern, 'horizontal_pull');
+
+  assert.notEqual(lats[0]!.exercise.id, upperBack[0]!.exercise.id, 'the two should not share a staple');
+
+  assert.equal(rateExercisesFor('hamstrings', opts())[0]!.exercise.pattern, 'hinge');
+  assert.equal(rateExercisesFor('side_delts', opts())[0]!.exercise.pattern, 'isolation');
+});
+
+test('exercises you mark as liked rank higher and say why', () => {
+  const plain = rateExercisesFor('quads', opts());
+  const goblet = plain.findIndex((r) => r.exercise.id === 'goblet_squat');
+
+  const favoured = makeProfile({ preferredExercises: ['goblet_squat'] });
+  const withLike = rateExercisesFor('quads', opts(favoured));
+  const movedTo = withLike.findIndex((r) => r.exercise.id === 'goblet_squat');
+
+  assert.ok(movedTo < goblet, `liking it should raise it: ${goblet} → ${movedTo}`);
+  assert.ok(withLike[movedTo]!.reasons.includes('One you said you like'));
+});

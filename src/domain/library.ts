@@ -1,5 +1,5 @@
 import { EXERCISES, availableExercises, progressionFamily } from './exercises';
-import { ALL_MUSCLES, MUSCLE_LABEL, MUSCLE_REGION, type Region } from './muscles';
+import { ALL_MUSCLES, MUSCLE_LABEL, MUSCLE_REGION, isSignatureFor, type Region } from './muscles';
 import { GOAL_LABEL, dominantGoal, goalFitScore } from './goals';
 import { ladderStepAllowed } from './progression';
 import type { Equipment, Exercise, Muscle, Profile, SessionLog, WeekPlan } from './types';
@@ -88,6 +88,9 @@ function reasonsFor(rating: Omit<ExerciseRating, 'reasons' | 'tier'>, profile: P
     reasons.push(`Covers ${short.map((m) => MUSCLE_LABEL[m].toLowerCase()).join(' and ')}, which your week is short on`);
   }
 
+  if (profile.preferredExercises.includes(exercise.id)) {
+    reasons.unshift('One you said you like');
+  }
   if (exercise.notes) reasons.push(exercise.notes);
   return reasons;
 }
@@ -118,7 +121,12 @@ export function rateExercisesFor(muscle: Muscle, options: RateOptions): Exercise
       // Goal fit leads: the best side-delt movement is a lateral raise, not
       // whichever exercise happens to list the most muscles. Breadth breaks
       // ties in favour of movements that pay for more of the body per set.
-      const score = goalFit * 0.55 + headroom * 0.2 + breadth * 0.15 + muscleNeed * 0.1;
+      const merit = goalFit * 0.55 + headroom * 0.2 + breadth * 0.15 + muscleNeed * 0.1;
+      // A muscle's signature movement leads its own group: pull-ups for lats,
+      // rows for upper back, rather than rows winning both.
+      const signature = isSignatureFor(exercise.pattern, [muscle]) ? 1.3 : 1;
+      const liked = profile.preferredExercises.includes(exercise.id) ? 1.25 : 1;
+      const score = merit * signature * liked;
       const base = { exercise, breadth, goalFit, headroom, need: muscleNeed, score };
       return { ...base, reasons: reasonsFor(base, profile, need), tier: 'accessory' as const };
     })
@@ -198,6 +206,14 @@ export function standInsFor(exercise: Exercise, options: StandInOptions): Exerci
     .filter((rating) => rating.exercise.id !== exercise.id)
     .filter((rating) => !rating.exercise.equipment.some((e) => contested.has(e)))
     .filter((rating, index, all) => all.findIndex((r) => r.exercise.id === rating.exercise.id) === index)
+    // The first primary muscle is what the exercise is for. Covering half of a
+    // two-muscle lift can still mean missing the point of it — an overhead
+    // press shares the front delt with an incline press but trains no chest.
+    .filter((rating) => {
+      const mainTarget = exercise.primary[0];
+      if (!mainTarget) return true;
+      return rating.exercise.primary.includes(mainTarget) || rating.exercise.secondary.includes(mainTarget);
+    })
     .filter((rating) => overlap(rating.exercise) >= 0.5)
     // Doing the same kind of movement matters as much as hitting the same
     // muscles: if the pulldown station is busy, the answer is pull-ups, not a

@@ -299,3 +299,24 @@ test('a cramped gym is never prescribed a walking exercise', () => {
     assert.ok(day.exercises.length > 0, 'the day still has to be filled');
   }
 });
+
+test('lat work comes from a vertical pull, not a third row', () => {
+  for (const seed of [1, 2, 3, 4]) {
+    const result = plan({}, RUNS_AND_VOLLEY, seed);
+    const exercises = result.days.flatMap((d) => d.exercises.map((e) => EXERCISE_BY_ID[e.exerciseId]!));
+    const latWork = exercises.filter((e) => e.primary.includes('lats'));
+    if (latWork.length === 0) continue;
+    assert.ok(
+      latWork.some((e) => e.pattern === 'vertical_pull'),
+      `seed ${seed}: lats trained only by ${latWork.map((e) => e.name).join(', ')}`,
+    );
+  }
+});
+
+test('an exercise you like is used when it fits', () => {
+  const liked = plan({ preferredExercises: ['goblet_squat'] }, RUNS_AND_VOLLEY, 3);
+  const plain = plan({}, RUNS_AND_VOLLEY, 3);
+  const has = (p: typeof liked) => p.days.some((d) => d.exercises.some((e) => e.exerciseId === 'goblet_squat'));
+  // It need not always appear, but liking it must never make it less likely.
+  assert.ok(has(liked) || !has(plain), 'a liked exercise should not be pushed out');
+});

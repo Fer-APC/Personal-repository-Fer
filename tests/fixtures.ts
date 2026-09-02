@@ -16,6 +16,7 @@ export function makeProfile(overrides: Partial<Profile> = {}): Profile {
     avoid: [],
     limitedSpace: false,
     excludedExercises: [],
+    preferredExercises: [],
     deloadEveryWeeks: 6,
     ...overrides,
   };

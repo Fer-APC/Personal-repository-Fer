@@ -153,7 +153,11 @@ The pipeline lives in `src/domain/` and runs in this order:
 
 Ratings blend goal fit (which leads, so the best side-delt movement is a lateral raise
 rather than whatever lists the most muscles), progression headroom, muscle worked per
-set, and what the current week is short of. Stand-ins additionally weigh how much of the
+set, and what the current week is short of. Each muscle also has a signature movement —
+a vertical pull for the lats, a row for the upper back, a hinge for the hamstrings —
+which leads its own group, so two muscles do not come back with the same staple and
+sessions do not fill up with one movement. Exercises you mark as liked rank higher and
+are preferred when the planner builds a session. Stand-ins additionally weigh how much of the
 original they replace and whether they keep the same movement pattern, and show one rung
 per progression ladder so the list is six options rather than one ladder four times.
 

@@ -117,6 +117,7 @@ export function LibraryView() {
                       <span className="small">{rating.exercise.name}</span>
                       <span className="tiny muted" style={{ display: 'block' }}>{rating.reasons[0]}</span>
                     </span>
+                    {store.state.profile.preferredExercises.includes(rating.exercise.id) && <Chip tone="good">★</Chip>}
                     {rating.tier !== 'accessory' && (
                       <Chip tone={rating.tier === 'staple' ? 'accent' : 'default'}>{TIER_LABEL[rating.tier]}</Chip>
                     )}
@@ -154,6 +155,7 @@ function ExerciseDetail({
   const { exercise } = rating;
   const plan = store.planFor(currentWeek());
   const banned = store.state.profile.excludedExercises.includes(exercise.id);
+  const liked = store.state.profile.preferredExercises.includes(exercise.id);
 
   const alternatives = useMemo(
     () =>
@@ -206,8 +208,23 @@ function ExerciseDetail({
 
       <button
         type="button"
-        className={`wide ${banned ? '' : 'danger'}`}
+        className={`wide ${liked ? 'primary' : ''}`}
         style={{ marginTop: 14 }}
+        onClick={() =>
+          store.updateProfile({
+            preferredExercises: liked
+              ? store.state.profile.preferredExercises.filter((id: string) => id !== exercise.id)
+              : [...store.state.profile.preferredExercises, exercise.id],
+          })
+        }
+      >
+        {liked ? '★ One you like — tap to unset' : '☆ I like this one, use it more'}
+      </button>
+
+      <button
+        type="button"
+        className={`wide ${banned ? '' : 'danger'}`}
+        style={{ marginTop: 8 }}
         onClick={() =>
           store.updateProfile({
             excludedExercises: banned

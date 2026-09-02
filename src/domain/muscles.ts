@@ -1,4 +1,4 @@
-import type { Muscle } from './types';
+import type { Muscle, Pattern } from './types';
 
 export const ALL_MUSCLES: Muscle[] = [
   'chest', 'front_delts', 'side_delts', 'rear_delts', 'rotator_cuff',
@@ -45,6 +45,40 @@ export const UPPER: Muscle[] = ALL_MUSCLES.filter(
   (m) => MUSCLE_REGION[m] === 'push' || MUSCLE_REGION[m] === 'pull',
 );
 export const LOWER: Muscle[] = ALL_MUSCLES.filter((m) => MUSCLE_REGION[m] === 'legs');
+
+/**
+ * The movement that most directly builds each muscle. Without this, ranking is
+ * blind to the difference between a muscle's signature lift and something that
+ * merely involves it — which is how lats and upper back both came back as
+ * rows, and why a session could be three rows deep.
+ */
+export const SIGNATURE_PATTERNS: Partial<Record<Muscle, Pattern[]>> = {
+  chest: ['horizontal_push'],
+  front_delts: ['vertical_push'],
+  side_delts: ['isolation'],
+  rear_delts: ['isolation'],
+  rotator_cuff: ['isolation'],
+  lats: ['vertical_pull'],
+  upper_back: ['horizontal_pull'],
+  traps: ['carry', 'isolation'],
+  lower_back: ['hinge'],
+  biceps: ['isolation', 'vertical_pull'],
+  triceps: ['isolation', 'vertical_push'],
+  forearms: ['carry', 'isolation'],
+  quads: ['squat', 'lunge'],
+  hamstrings: ['hinge'],
+  glutes: ['hinge', 'lunge'],
+  adductors: ['lunge', 'isolation'],
+  calves: ['isolation'],
+  abs: ['core'],
+  obliques: ['core'],
+  hip_flexors: ['core'],
+};
+
+/** Whether an exercise is a signature movement for one of the muscles it targets. */
+export function isSignatureFor(pattern: Pattern, muscles: Muscle[]): boolean {
+  return muscles.some((muscle) => SIGNATURE_PATTERNS[muscle]?.includes(pattern) ?? false);
+}
 
 /**
  * Hours a muscle wants before it is loaded hard again. Small muscles recover

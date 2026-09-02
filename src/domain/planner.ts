@@ -1,4 +1,4 @@
-import { ALL_MUSCLES, MUSCLE_REGION, RECOVERY_HOURS } from './muscles';
+import { ALL_MUSCLES, MUSCLE_REGION, RECOVERY_HOURS, isSignatureFor } from './muscles';
 import { EXERCISE_BY_ID, availableExercises } from './exercises';
 import { blendPrescription, blendedPatternBias, goalFitScore } from './goals';
 import { computeExternalLoad, type ExternalLoad } from './activities';
@@ -207,6 +207,11 @@ function scoreExercise(
   let score = demandScore;
   score *= 0.35 + goalFitScore(exercise.goalFit, profile.goals);
   score *= blendedPatternBias(profile.goals, exercise.pattern);
+
+  // Prefer the movement that actually builds what the day still owes, so lat
+  // demand pulls in a chin-up rather than yet another row.
+  if (isSignatureFor(exercise.pattern, exercise.primary)) score *= 1.25;
+  if (profile.preferredExercises.includes(exercise.id)) score *= 1.3;
 
   // Heavy compounds belong at the start; isolation earns its place at the end.
   // Skill work is technical rather than heavy, but still needs a fresh nervous

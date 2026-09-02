@@ -26,6 +26,7 @@ export function defaultProfile(): Profile {
     avoid: [],
     limitedSpace: false,
     excludedExercises: [],
+    preferredExercises: [],
     deloadEveryWeeks: 6,
   };
 }

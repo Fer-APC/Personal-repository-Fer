@@ -126,6 +126,8 @@ export interface Profile {
   limitedSpace: boolean;
   /** Exercises the user has banned. */
   excludedExercises: string[];
+  /** Exercises the user likes and wants to see more of. */
+  preferredExercises: string[];
   deloadEveryWeeks: number;
 }
 
