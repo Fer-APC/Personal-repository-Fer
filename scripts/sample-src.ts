@@ -1,17 +1,14 @@
-/** Prints the exercise library ranking — handy when tuning the ratings. */
-import { rateExercisesFor, standInsFor } from '../src/domain/library';
-import { EXERCISE_BY_ID } from '../src/domain/exercises';
-import { MUSCLE_LABEL, ALL_MUSCLES } from '../src/domain/muscles';
+import { rateExercisesFor } from '../src/domain/library';
+import { MUSCLE_LABEL } from '../src/domain/muscles';
 import { makeProfile } from '../tests/fixtures';
+import type { Muscle } from '../src/domain/types';
 
-const options = { profile: makeProfile(), logs: [] };
-for (const muscle of ALL_MUSCLES) {
-  const rated = rateExercisesFor(muscle, options);
-  if (rated.length === 0) continue;
-  console.log(`${MUSCLE_LABEL[muscle].padEnd(14)} ${rated.filter((r) => r.tier === 'staple').map((r) => r.exercise.name).join(', ')}`);
-}
-console.log('\nStand-ins when the station is busy:');
-for (const id of ['bb_bench', 'back_squat', 'lat_pulldown']) {
-  const ex = EXERCISE_BY_ID[id]!;
-  console.log(`  ${ex.name} → ${standInsFor(ex, { ...options, equipmentBusy: true }).map((r) => r.exercise.name).join(', ')}`);
+const muscles: Muscle[] = ['chest','front_delts','side_delts','rear_delts','lats','upper_back','biceps','triceps','quads','hamstrings','glutes','abs','obliques','lower_back'];
+for (const [label, preferNoQueue] of [['MACHINES FINE', false], ['AVOIDING MACHINES', true]] as [string, boolean][]) {
+  console.log(`\n=== ${label} ===`);
+  const options = { profile: makeProfile({ preferNoQueue, limitedSpace: true }), logs: [] };
+  for (const m of muscles) {
+    const top = rateExercisesFor(m, options).slice(0, 3);
+    console.log(`${MUSCLE_LABEL[m].padEnd(13)} ${top.map((r) => r.exercise.name).join('  ·  ')}`);
+  }
 }

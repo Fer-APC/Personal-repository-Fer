@@ -124,6 +124,11 @@ export interface Profile {
   avoid: Muscle[];
   /** True when the gym has no room to walk a carry or a travelling lunge. */
   limitedSpace: boolean;
+  /**
+   * Prefer work that does not queue for a machine — bodyweight first, then
+   * free weights, with cable and machine stations last.
+   */
+  preferNoQueue: boolean;
   /** Exercises the user has banned. */
   excludedExercises: string[];
   /** Exercises the user likes and wants to see more of. */

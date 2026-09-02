@@ -164,6 +164,19 @@ export function SetupView() {
       </CollapsibleCard>
 
       <CollapsibleCard title="Work around" summary="space, injuries and banned exercises">
+        <FieldGroup label="Busy gym" hint="favours work that needs no machine">
+          <button
+            type="button"
+            className="toggle"
+            aria-pressed={profile.preferNoQueue}
+            onClick={() => store.updateProfile({ preferNoQueue: !profile.preferNoQueue })}
+          >
+            {profile.preferNoQueue
+              ? 'Avoiding machines others may be using'
+              : 'Machines are fine, I will wait'}
+          </button>
+        </FieldGroup>
+
         <FieldGroup label="Gym space" hint="drops carries and travelling lunges">
           <button
             type="button"

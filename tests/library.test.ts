@@ -201,3 +201,50 @@ test('exercises you mark as liked rank higher and say why', () => {
   assert.ok(movedTo < goblet, `liking it should raise it: ${goblet} → ${movedTo}`);
   assert.ok(withLike[movedTo]!.reasons.includes('One you said you like'));
 });
+
+test('avoiding queues demotes machines without banning them', () => {
+  const relaxed = opts();
+  const busyGym = opts(makeProfile({ preferNoQueue: true }));
+
+  const rankOf = (options: ReturnType<typeof opts>, muscle: Parameters<typeof rateExercisesFor>[0], id: string) =>
+    rateExercisesFor(muscle, options).findIndex((r) => r.exercise.id === id);
+
+  // A cable lateral raise needs the tower; a dumbbell one does not.
+  assert.ok(
+    rankOf(busyGym, 'side_delts', 'cable_lateral_raise') > rankOf(relaxed, 'side_delts', 'cable_lateral_raise'),
+    'the cable version should fall',
+  );
+  assert.equal(rateExercisesFor('side_delts', busyGym)[0]!.exercise.id, 'lateral_raise');
+
+  // Still listed, in case it is what is free.
+  assert.ok(rankOf(busyGym, 'side_delts', 'cable_lateral_raise') >= 0, 'machines must remain available');
+});
+
+test('free weights are not demoted along with the machines', () => {
+  // Dumbbells are rarely what someone else is on, so pressing should survive.
+  const busyGym = opts(makeProfile({ preferNoQueue: true }));
+  const chest = rateExercisesFor('chest', busyGym);
+  assert.ok(
+    chest.slice(0, 2).some((r) => r.exercise.equipment.includes('dumbbell')),
+    `expected dumbbell pressing to hold its place, got ${chest.slice(0, 2).map((r) => r.exercise.name).join(', ')}`,
+  );
+});
+
+test('work needing nothing at all says why it was picked', () => {
+  // Dip bars are still a station someone can be on; a diamond push-up is not.
+  const busyGym = opts(makeProfile({ preferNoQueue: true }));
+  const pushup = rateExercisesFor('triceps', busyGym).find((r) => r.exercise.id === 'diamond_pushup');
+  assert.ok(pushup, 'a bodyweight triceps option should be listed');
+  assert.ok(pushup!.reasons.some((r) => r.includes('nothing to wait for')));
+
+  const dip = rateExercisesFor('triceps', busyGym).find((r) => r.exercise.id === 'dip');
+  assert.ok(
+    !dip!.reasons.some((r) => r.includes('nothing to wait for')),
+    'dip bars are a station, so they should not claim to be free',
+  );
+});
+
+test('the standing dumbbell curl is available', () => {
+  const biceps = rateExercisesFor('biceps', opts());
+  assert.ok(biceps.some((r) => r.exercise.id === 'db_curl'), 'a plain dumbbell curl should exist');
+});

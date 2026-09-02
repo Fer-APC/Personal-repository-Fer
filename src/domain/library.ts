@@ -1,4 +1,4 @@
-import { EXERCISES, availableExercises, progressionFamily } from './exercises';
+import { EXERCISES, availableExercises, progressionFamily, stationContention } from './exercises';
 import { ALL_MUSCLES, MUSCLE_LABEL, MUSCLE_REGION, isSignatureFor, type Region } from './muscles';
 import { GOAL_LABEL, dominantGoal, goalFitScore } from './goals';
 import { ladderStepAllowed } from './progression';
@@ -91,6 +91,9 @@ function reasonsFor(rating: Omit<ExerciseRating, 'reasons' | 'tier'>, profile: P
   if (profile.preferredExercises.includes(exercise.id)) {
     reasons.unshift('One you said you like');
   }
+  if (profile.preferNoQueue && stationContention(exercise) === 0) {
+    reasons.unshift('Needs no equipment — nothing to wait for');
+  }
   if (exercise.notes) reasons.push(exercise.notes);
   return reasons;
 }
@@ -126,7 +129,8 @@ export function rateExercisesFor(muscle: Muscle, options: RateOptions): Exercise
       // rows for upper back, rather than rows winning both.
       const signature = isSignatureFor(exercise.pattern, [muscle]) ? 1.3 : 1;
       const liked = profile.preferredExercises.includes(exercise.id) ? 1.25 : 1;
-      const score = merit * signature * liked;
+      const queue = profile.preferNoQueue ? [1.15, 1.05, 0.6][stationContention(exercise)]! : 1;
+      const score = merit * signature * liked * queue;
       const base = { exercise, breadth, goalFit, headroom, need: muscleNeed, score };
       return { ...base, reasons: reasonsFor(base, profile, need), tier: 'accessory' as const };
     })

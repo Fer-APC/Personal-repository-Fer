@@ -15,6 +15,7 @@ export function makeProfile(overrides: Partial<Profile> = {}): Profile {
     structures: [DEFAULT_STRUCTURE, DEFAULT_STRUCTURE, DEFAULT_STRUCTURE],
     avoid: [],
     limitedSpace: false,
+    preferNoQueue: false,
     excludedExercises: [],
     preferredExercises: [],
     deloadEveryWeeks: 6,

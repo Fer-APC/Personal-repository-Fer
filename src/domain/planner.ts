@@ -1,5 +1,5 @@
 import { ALL_MUSCLES, MUSCLE_REGION, RECOVERY_HOURS, isSignatureFor } from './muscles';
-import { EXERCISE_BY_ID, availableExercises } from './exercises';
+import { EXERCISE_BY_ID, availableExercises, stationContention } from './exercises';
 import { blendPrescription, blendedPatternBias, goalFitScore } from './goals';
 import { computeExternalLoad, type ExternalLoad } from './activities';
 import { computeVolumeTargets } from './volume';
@@ -212,6 +212,13 @@ function scoreExercise(
   // demand pulls in a chin-up rather than yet another row.
   if (isSignatureFor(exercise.pattern, exercise.primary)) score *= 1.25;
   if (profile.preferredExercises.includes(exercise.id)) score *= 1.3;
+
+  // Training around other people. Dumbbells and barbells are rarely the
+  // bottleneck — a single machine or cable tower is — so this demotes those
+  // rather than promoting bodyweight over everything loaded.
+  if (profile.preferNoQueue) {
+    score *= [1.15, 1.05, 0.6][stationContention(exercise)]!;
+  }
 
   // Heavy compounds belong at the start; isolation earns its place at the end.
   // Skill work is technical rather than heavy, but still needs a fresh nervous

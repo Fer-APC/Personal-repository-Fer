@@ -64,6 +64,11 @@ rating explained: how well it fits your goals, how much muscle it trains per set
 much room you have left to progress on it. Externally loaded lifts never run out;
 bodyweight work runs out when its ladder does.
 
+**Trains around other people.** Setup → Work around has a switch for a busy gym: cable
+towers and machines are demoted in favour of work you can start immediately. Free weights
+are left alone, because a dumbbell is rarely what someone else is on — so pressing
+survives while the cable lateral raise gives way to the dumbbell one.
+
 **Respects the room you train in.** Setup → Work around has a switch for a gym with no
 space to walk with weight; carries and travelling lunges are then never prescribed.
 Supersets prefer partners that use kit you already have in your hands, so a superset does

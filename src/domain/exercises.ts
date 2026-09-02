@@ -184,6 +184,7 @@ export const EXERCISES: Exercise[] = [
   // ---------------------------------------------------------------- isolation: arms
   E({ id: 'bb_curl', name: 'Barbell curl', pattern: 'isolation', primary: ['biceps'], secondary: ['forearms'], equipment: ['barbell'], systemicCost: 0.7, goalFit: g(0.9, 0.5, 0.25, 0.6, 0.5) }),
   E({ id: 'incline_db_curl', name: 'Incline dumbbell curl', pattern: 'isolation', primary: ['biceps'], secondary: ['forearms'], equipment: ['dumbbell', 'bench'], systemicCost: 0.6, goalFit: g(0.95, 0.4, 0.25, 0.65, 0.55) }),
+  E({ id: 'db_curl', name: 'Dumbbell curl', pattern: 'isolation', primary: ['biceps'], secondary: ['forearms'], equipment: ['dumbbell'], systemicCost: 0.6, goalFit: g(0.9, 0.45, 0.3, 0.75, 0.65) }),
   E({ id: 'hammer_curl', name: 'Hammer curl', pattern: 'isolation', primary: ['biceps', 'forearms'], secondary: [], equipment: ['dumbbell'], systemicCost: 0.6, goalFit: g(0.9, 0.45, 0.4, 0.7, 0.7) }),
   E({ id: 'cable_curl', name: 'Cable curl', pattern: 'isolation', primary: ['biceps'], secondary: ['forearms'], equipment: ['cable'], systemicCost: 0.5, goalFit: g(0.9, 0.4, 0.25, 0.8, 0.6) }),
   E({ id: 'preacher_curl', name: 'Preacher curl', pattern: 'isolation', primary: ['biceps'], secondary: [], equipment: ['machine', 'barbell'], systemicCost: 0.6, goalFit: g(0.9, 0.45, 0.2, 0.65, 0.5) }),
@@ -205,6 +206,16 @@ export const EXERCISES: Exercise[] = [
   E({ id: 'hip_adduction', name: 'Hip adduction machine', pattern: 'isolation', primary: ['adductors'], secondary: [], equipment: ['machine'], systemicCost: 0.5, goalFit: g(0.7, 0.35, 0.2, 0.8, 1) }),
   E({ id: 'tibialis_raise', name: 'Tibialis raise', pattern: 'isolation', primary: ['calves'], secondary: [], equipment: ['bodyweight', 'bands'], systemicCost: 0.3, goalFit: g(0.4, 0.3, 0.4, 0.8, 1), notes: 'Shin resilience — cuts down shin splints from sand and road work.' }),
 ];
+
+/**
+ * How tied an exercise is to a single station someone else may be using.
+ * 0 needs nothing, 1 uses free weights there are usually several of, 2 needs a
+ * specific machine or cable tower.
+ */
+export function stationContention(exercise: Exercise): 0 | 1 | 2 {
+  if (exercise.equipment.every((e) => e === 'bodyweight')) return 0;
+  return exercise.equipment.some((e) => e === 'machine' || e === 'cable') ? 2 : 1;
+}
 
 export const EXERCISE_BY_ID: Record<string, Exercise> = Object.fromEntries(
   EXERCISES.map((e) => [e.id, e]),
