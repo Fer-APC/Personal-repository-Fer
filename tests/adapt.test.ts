@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import { generateWeekPlan } from '../src/domain/planner';
 import { adaptRemainingDays, defaultState } from '../src/domain/store';
-import { computeWeekProgress, lockedDayIndexes } from '../src/domain/progress';
+import { computeWeekProgress, lockedDayIndexes, nextSessionIndex } from '../src/domain/progress';
 import { EXERCISE_BY_ID } from '../src/domain/exercises';
 import { makeProfile, RUNS_AND_VOLLEY } from './fixtures';
 import { AD_HOC_DAY, type AppState, type LoggedSet, type SessionLog, type WeekPlan } from '../src/domain/types';
@@ -512,4 +512,25 @@ test('a week with no gym days left still reports what was trained', () => {
     plan.warnings.some((w) => w.includes('No gym days left')),
     'the user should be told why nothing is scheduled',
   );
+});
+
+test('the week opens on a day you missed rather than skipping to the end', () => {
+  const state = baseState();
+  const plan = state.plans[WEEK]!;
+  const lastDate = plan.days[plan.days.length - 1]!.date;
+  const afterTheWeek = `${lastDate.slice(0, 8)}${String(Number(lastDate.slice(8)) + 1).padStart(2, '0')}`;
+
+  // Nothing trained and the whole week already behind you: the first untrained
+  // day is still the one to offer, not the last card on the screen.
+  assert.equal(nextSessionIndex(plan, [], afterTheWeek), 0);
+
+  // With day one trained, focus moves on to the next untouched day.
+  assert.equal(nextSessionIndex(plan, [logPlannedDay(state, 0)], afterTheWeek), 1);
+
+  // Mid-week, the next day that has not started yet wins.
+  assert.equal(nextSessionIndex(plan, [logPlannedDay(state, 0)], plan.days[0]!.date), 1);
+
+  // Everything trained: fall back to the last day rather than nothing.
+  const allDone = plan.days.map((_, i) => logPlannedDay(state, i));
+  assert.equal(nextSessionIndex(plan, allDone, afterTheWeek), plan.days.length - 1);
 });

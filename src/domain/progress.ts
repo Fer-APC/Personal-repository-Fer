@@ -48,6 +48,21 @@ export function hasLoggedWork(log: SessionLog | undefined): boolean {
 }
 
 /**
+ * The day the week screen should open on: the next one you have not put any
+ * work into. Today or later is the usual answer; when you have fallen behind,
+ * a day you never trained is still the day you are here for, so it wins over
+ * skipping ahead to the end of the week.
+ */
+export function nextSessionIndex(plan: WeekPlan, logs: SessionLog[], today: string): number {
+  const week = weekLogs(logs, plan.weekStart);
+  const untouched = plan.days.map((_, index) => !hasLoggedWork(week.find((l) => l.dayIndex === index)));
+  const upcoming = plan.days.findIndex((day, index) => day.date >= today && untouched[index]);
+  if (upcoming >= 0) return upcoming;
+  const missed = untouched.indexOf(true);
+  return missed >= 0 ? missed : Math.max(0, plan.days.length - 1);
+}
+
+/**
  * Days that can no longer change: already trained, or in the past. Their work
  * counts for what it was, not what it was supposed to be.
  */

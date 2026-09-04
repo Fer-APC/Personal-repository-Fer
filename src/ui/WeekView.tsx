@@ -4,7 +4,7 @@ import { EXERCISE_BY_ID } from '../domain/exercises';
 import { MUSCLE_LABEL } from '../domain/muscles';
 import { ACTIVITY_LABEL } from '../domain/activities';
 import { standInsFor } from '../domain/library';
-import { computeWeekProgress } from '../domain/progress';
+import { computeWeekProgress, nextSessionIndex } from '../domain/progress';
 import { sessionIdFor } from '../domain/store';
 import { WEEKDAY_LABEL, addDays, formatDayLabel, fromISODate, toISODate, weekStartISO } from '../domain/date';
 import { Card, Chip, Modal } from './components';
@@ -49,14 +49,7 @@ export function WeekView({ onOpenSession }: { onOpenSession: (logId: string) => 
 
   // Sessions beyond your weekly target are offered, not required.
   // The session you are most likely here for: the next one you have not done.
-  const focusIndex = (() => {
-    const next = plan.days.findIndex((day) => {
-      const log = store.logFor(weekStart, plan.days.indexOf(day));
-      const started = log?.exercises.some((e) => e.sets.some((set) => set.done));
-      return day.date >= today && !started;
-    });
-    return next >= 0 ? next : plan.days.length - 1;
-  })();
+  const focusIndex = nextSessionIndex(plan, store.state.logs, today);
 
   const sessionsDone = store.state.logs.filter(
     (log) => log.weekStart === weekStart && (log.completed || log.exercises.some((e) => e.sets.some((s) => s.done))),
@@ -201,23 +194,29 @@ function DayCard({
         {day.emphasis.map((muscle) => <Chip key={muscle}>{MUSCLE_LABEL[muscle]}</Chip>)}
       </div>
 
-      {expanded ? (
-        <button
-          type="button"
-          className={`wide ${doneSets > 0 ? '' : 'primary'}`}
-          style={{ marginTop: 10, marginBottom: 4 }}
-          onClick={() => {
-            store.startSession(weekStart, dayIndex);
-            onOpenSession(sessionIdFor(weekStart, dayIndex));
-          }}
-        >
-          {log?.completed ? 'Session complete — review' : doneSets > 0 ? `Continue (${doneSets} sets logged)` : 'Start session'}
-        </button>
-      ) : (
-        <button type="button" className="wide" onClick={() => setExpanded(true)} style={{ marginTop: 8 }}>
-          Show {day.exercises.length} exercises
-        </button>
-      )}
+      {/* Starting a session must never depend on having opened the card first:
+          a collapsed day is still a day you can walk into the gym and do. */}
+      <button
+        type="button"
+        className={`wide ${doneSets > 0 || log?.completed ? '' : 'primary'}`}
+        style={{ marginTop: 10 }}
+        onClick={() => {
+          store.startSession(weekStart, dayIndex);
+          onOpenSession(sessionIdFor(weekStart, dayIndex));
+        }}
+      >
+        {log?.completed ? 'Session complete — review' : doneSets > 0 ? `Continue (${doneSets} sets logged)` : 'Start session'}
+      </button>
+
+      <button
+        type="button"
+        className="wide quiet"
+        style={{ marginTop: 6, marginBottom: 4 }}
+        onClick={() => setExpanded((open) => !open)}
+        aria-expanded={expanded}
+      >
+        {expanded ? 'Hide exercises' : `Show ${day.exercises.length} exercises`}
+      </button>
 
       {expanded && day.exercises.map((exercise, index) => {
         const previous = day.exercises[index - 1];
